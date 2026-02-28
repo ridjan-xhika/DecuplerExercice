@@ -131,12 +131,13 @@ function calculateScore(analysisResults) {
       competitorPenalty
     },
     stats: {
-      totalQueries: totalResponses,
+      totalQueries: totalResponses, // Only successful responses counted
       totalMentions: responsesWithTarget,
       top1Count,
       top3Count,
       avgPosition: avgPosition ? Math.round(avgPosition * 100) / 100 : null,
-      mentionRate: Math.round((responsesWithTarget / totalResponses) * 100)
+      mentionRate: Math.round((responsesWithTarget / totalResponses) * 100),
+      note: 'Only successful AI responses are counted - failed queries are excluded'
     }
   };
 }

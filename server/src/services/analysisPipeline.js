@@ -53,12 +53,13 @@ async function runFullAnalysis(domainName, options = {}) {
     // Step 3: Run AI queries
     const aiResults = await processDomainsPrompts(domain.id);
     report.aiResponses = {
-      count: aiResults.total,
-      successful: aiResults.successful,
-      failed: aiResults.failed
+      promptsTotal: aiResults.total,
+      promptsSuccessful: aiResults.successful,
+      promptsFailed: aiResults.failed,
+      totalResponses: aiResults.totalResponses // Actual responses stored (excludes failed)
     };
 
-    // Step 4: Get stored responses and analyze
+    // Step 4: Get stored responses and analyze (only successful responses)
     const responses = await getResponsesForDomain(domain.id);
     const analysisResults = await analyzeAllResponses(responses, domainName) || {
       totalResponses: 0,
@@ -85,15 +86,17 @@ async function runFullAnalysis(domainName, options = {}) {
     const trend = await getScoreTrend(domain.id);
     report.trend = trend;
 
-    // Step 7: Generate recommendations
-    const recommendations = await generateAndSaveRecommendations(
+    // Step 7: Generate recommendations (standard + AI-generated)
+    const recommendationResults = await generateAndSaveRecommendations(
       domain.id,
       scoreData.id,
       analysisResults,
       scoreData,
-      trend
+      trend,
+      domainName // Pass brand name for AI recommendations
     );
-    report.recommendations = recommendations;
+    report.recommendations = recommendationResults.standard;
+    report.aiRecommendations = recommendationResults.aiGenerated;
 
     // Step 8: Get top competitors
     const topCompetitors = await Competitor.getTopCompetitors(domain.id, 5);

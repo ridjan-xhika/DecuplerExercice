@@ -76,10 +76,13 @@ CREATE TABLE IF NOT EXISTS recommendations (
   id INT AUTO_INCREMENT PRIMARY KEY,
   domain_id INT NOT NULL,
   score_id INT, -- linked to the visibility score that triggered this
-  recommendation_type VARCHAR(50), -- 'content', 'positioning', 'competitor_gap'
+  recommendation_type VARCHAR(50), -- 'content', 'positioning', 'competitor_gap', 'ai_generated'
   title VARCHAR(255) NOT NULL,
   description TEXT NOT NULL,
   priority VARCHAR(20) DEFAULT 'medium', -- 'high', 'medium', 'low'
+  action_steps JSON, -- detailed action steps with timeframes
+  is_ai_generated BOOLEAN DEFAULT FALSE,
+  ai_provider VARCHAR(50), -- 'ollama', 'gemini', etc. if AI generated
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (domain_id) REFERENCES domains(id) ON DELETE CASCADE,
   FOREIGN KEY (score_id) REFERENCES visibility_scores(id) ON DELETE SET NULL

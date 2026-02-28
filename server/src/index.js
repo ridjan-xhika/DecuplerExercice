@@ -3,7 +3,7 @@ const cors = require('cors');
 require('dotenv').config();
 
 const { testConnection } = require('./config/db');
-const { checkOllamaStatus } = require('./services/ollamaClient');
+const { checkAllProviders } = require('./services/aiClient');
 
 const app = express();
 
@@ -23,13 +23,17 @@ app.use('/api/analysis', analysisRoutes);
 // Health check
 app.get('/api/health', async (req, res) => {
   const dbConnected = await testConnection();
-  const ollamaStatus = await checkOllamaStatus();
+  const aiStatus = await checkAllProviders();
   res.json({ 
     status: 'ok', 
     message: 'Server is running',
     database: dbConnected ? 'connected' : 'disconnected',
-    ollama: ollamaStatus.working ? 'connected' : 'disconnected',
-    models: ollamaStatus.models || []
+    ai: {
+      ollama: aiStatus.ollama.working ? 'connected' : 'disconnected',
+      gemini: aiStatus.gemini.working ? 'connected' : 'disconnected',
+      anyWorking: aiStatus.anyWorking
+    },
+    ollamaModels: aiStatus.ollama.models || []
   });
 });
 

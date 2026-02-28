@@ -1,6 +1,6 @@
 /**
  * Unified AI Client Service
- * Routes queries to multiple AI providers (Ollama and Gemini)
+ * Routes queries to ALL AI providers (Ollama and Gemini)
  */
 
 const { askOllama, checkOllamaStatus } = require('./ollamaClient');
@@ -12,54 +12,67 @@ const PROVIDERS = {
   gemini: { ask: askGemini, check: checkGeminiStatus }
 };
 
-// Get preferred provider order from env, default to ollama first (free)
-const getProviderOrder = () => {
-  const order = process.env.AI_PROVIDER_ORDER || 'ollama,gemini';
-  return order.split(',').map(p => p.trim().toLowerCase());
+// Get enabled providers from env
+const getEnabledProviders = () => {
+  const providers = process.env.AI_PROVIDERS || 'ollama,gemini';
+  return providers.split(',').map(p => p.trim().toLowerCase());
 };
 
 /**
- * Send a query to available AI providers
- * Tries providers in order, falls back if one fails
+ * Send a query to ALL enabled AI providers
+ * Returns array of responses from each provider
  * @param {string} query - The query to send
  * @param {object} options - Optional configuration
- * @returns {object} Response with text and metadata
+ * @returns {Array} Array of responses from all providers
  */
-async function askAI(query, options = {}) {
-  const { provider: specificProvider } = options;
-  
-  // If specific provider requested, use only that one
-  if (specificProvider && PROVIDERS[specificProvider]) {
-    return await PROVIDERS[specificProvider].ask(query, options);
-  }
+async function askAllProviders(query, options = {}) {
+  const enabledProviders = getEnabledProviders();
+  const results = [];
 
-  // Try providers in order
-  const providerOrder = getProviderOrder();
-  let lastError = null;
-
-  for (const providerName of providerOrder) {
+  for (const providerName of enabledProviders) {
     const provider = PROVIDERS[providerName];
     if (!provider) continue;
 
     try {
+      console.log(`Querying ${providerName}...`);
       const result = await provider.ask(query, options);
-      if (result.success) {
-        return result;
+      results.push({
+        provider: providerName,
+        ...result
+      });
+      
+      if (!result.success) {
+        console.log(`Provider ${providerName} failed: ${result.error}`);
       }
-      lastError = result.error;
-      console.log(`Provider ${providerName} failed: ${result.error}, trying next...`);
     } catch (error) {
-      lastError = error.message;
-      console.log(`Provider ${providerName} error: ${error.message}, trying next...`);
+      console.log(`Provider ${providerName} error: ${error.message}`);
+      results.push({
+        provider: providerName,
+        success: false,
+        error: error.message
+      });
     }
+
+    // Small delay between providers to be nice to APIs
+    await new Promise(resolve => setTimeout(resolve, 500));
   }
 
-  // All providers failed
-  return {
-    success: false,
-    error: `All AI providers failed. Last error: ${lastError}`,
-    provider: 'none'
-  };
+  return results;
+}
+
+/**
+ * Send a query to a specific provider only
+ * @param {string} query - The query to send
+ * @param {string} providerName - The provider to use
+ * @param {object} options - Optional configuration
+ * @returns {object} Response from provider
+ */
+async function askProvider(query, providerName, options = {}) {
+  const provider = PROVIDERS[providerName];
+  if (!provider) {
+    return { success: false, error: `Unknown provider: ${providerName}` };
+  }
+  return await provider.ask(query, options);
 }
 
 /**
@@ -75,29 +88,33 @@ async function checkAllProviders() {
   return {
     ollama: ollamaStatus,
     gemini: geminiStatus,
-    anyWorking: ollamaStatus.working || geminiStatus.working
+    anyWorking: ollamaStatus.working || geminiStatus.working,
+    allWorking: ollamaStatus.working && geminiStatus.working
   };
 }
 
 /**
- * Get the first available provider
- * @returns {string|null} Provider name or null if none available
+ * Get list of working providers
+ * @returns {Array} List of working provider names
  */
-async function getAvailableProvider() {
+async function getWorkingProviders() {
   const status = await checkAllProviders();
+  const working = [];
   
-  for (const providerName of getProviderOrder()) {
+  for (const providerName of getEnabledProviders()) {
     if (status[providerName]?.working) {
-      return providerName;
+      working.push(providerName);
     }
   }
   
-  return null;
+  return working;
 }
 
 module.exports = {
-  askAI,
+  askAllProviders,
+  askProvider,
   checkAllProviders,
-  getAvailableProvider,
+  getWorkingProviders,
+  getEnabledProviders,
   PROVIDERS
 };

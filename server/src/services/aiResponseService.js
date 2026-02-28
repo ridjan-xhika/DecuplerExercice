@@ -1,48 +1,54 @@
 /**
  * AI Response Service
- * Handles sending queries to Ollama and storing responses
+ * Handles sending queries to ALL AI providers and storing responses
  */
 
-const { askOllama, askOllamaBatch } = require('./ollamaClient');
+const { askAllProviders } = require('./aiClient');
 const { AIResponse, Prompt } = require('../models');
 
 /**
- * Send a single query and store the response
+ * Send a single query to ALL providers and store each response
  * @param {number} promptId - The prompt ID from database
  * @param {string} queryText - The query text to send
- * @returns {object} Stored response record
+ * @returns {Array} Array of stored response records (one per provider)
  */
 async function queryAndStore(promptId, queryText) {
-  const result = await askOllama(queryText);
+  // Query ALL providers
+  const results = await askAllProviders(queryText);
+  const storedResponses = [];
 
-  if (!result.success) {
-    throw new Error(`Ollama query failed: ${result.error}`);
+  // Store each successful response
+  for (const result of results) {
+    if (result.success) {
+      const storedResponse = await AIResponse.create(
+        promptId,
+        result.provider,
+        result.responseText,
+        result.responseTimeMs
+      );
+      storedResponses.push({
+        ...storedResponse,
+        usage: result.usage
+      });
+    } else {
+      console.log(`Skipping failed response from ${result.provider}: ${result.error}`);
+    }
   }
 
-  // Store in database
-  const storedResponse = await AIResponse.create(
-    promptId,
-    result.provider,
-    result.responseText,
-    result.responseTimeMs
-  );
+  if (storedResponses.length === 0) {
+    throw new Error(`All AI providers failed for this query`);
+  }
 
-  return {
-    ...storedResponse,
-    usage: result.usage
-  };
+  return storedResponses;
 }
 
 /**
- * Process all prompts for a domain and store responses
+ * Process all prompts for a domain and store responses from ALL providers
  * @param {number} domainId - The domain ID
  * @param {object} options - Processing options
  * @returns {object} Summary of processed responses
  */
 async function processDomainsPrompts(domainId, options = {}) {
-  // Reduced concurrency to 1 to avoid rate limits
-  const { concurrency = 1 } = options;
-
   // Get all prompts for this domain
   const prompts = await Prompt.findByDomainId(domainId);
 
@@ -52,45 +58,50 @@ async function processDomainsPrompts(domainId, options = {}) {
 
   const results = {
     total: prompts.length,
+    totalResponses: 0,
     successful: 0,
     failed: 0,
     responses: []
   };
 
-  // Process prompts in batches
-  for (let i = 0; i < prompts.length; i += concurrency) {
-    const batch = prompts.slice(i, i + concurrency);
-    
-    const batchPromises = batch.map(async (prompt) => {
-      try {
-        const response = await queryAndStore(prompt.id, prompt.query_text);
-        results.successful++;
-        return { promptId: prompt.id, success: true, response };
-      } catch (error) {
-        results.failed++;
-        return { promptId: prompt.id, success: false, error: error.message };
-      }
-    });
-
-    const batchResults = await Promise.all(batchPromises);
-    results.responses.push(...batchResults);
-
-    // Increased delay between batches to respect rate limits (2 seconds)
-    if (i + concurrency < prompts.length) {
-      await new Promise(resolve => setTimeout(resolve, 2000));
+  // Process prompts one at a time (each prompt queries ALL providers)
+  for (const prompt of prompts) {
+    try {
+      const responses = await queryAndStore(prompt.id, prompt.query_text);
+      results.successful++;
+      results.totalResponses += responses.length;
+      results.responses.push({ 
+        promptId: prompt.id, 
+        success: true, 
+        responseCount: responses.length,
+        providers: responses.map(r => r.ai_provider)
+      });
+    } catch (error) {
+      results.failed++;
+      results.responses.push({ 
+        promptId: prompt.id, 
+        success: false, 
+        error: error.message 
+      });
     }
+
+    // Delay between prompts to respect rate limits (2 seconds)
+    await new Promise(resolve => setTimeout(resolve, 2000));
   }
 
   return results;
 }
 
 /**
- * Get all responses for a domain with prompt info
+ * Get all SUCCESSFUL responses for a domain with prompt info
+ * Failed queries are excluded - only responses with actual content are returned
  * @param {number} domainId - The domain ID
- * @returns {Array} Responses with prompt details
+ * @returns {Array} Successful responses with prompt details
  */
 async function getResponsesForDomain(domainId) {
-  return await AIResponse.findByDomainId(domainId);
+  const responses = await AIResponse.findByDomainId(domainId);
+  // Extra safety: filter out any responses without actual content
+  return responses.filter(r => r.response_text && r.response_text.trim().length > 0);
 }
 
 /**

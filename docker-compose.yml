@@ -32,6 +32,12 @@ services:
       DB_USER: root
       DB_PASSWORD: ${DB_PASSWORD:-rootpassword}
       DB_NAME: ${DB_NAME:-ai_visibility}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      OLLAMA_URL: http://host.docker.internal:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+      AI_PROVIDERS: ${AI_PROVIDERS:-ollama,gemini}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       db:
         condition: service_healthy
