@@ -12,6 +12,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
+const queryRoutes = require('./routes/queryRoutes');
+app.use('/api/queries', queryRoutes);
 // app.use('/api/domains', require('./routes/domainRoutes'));
 // app.use('/api/analysis', require('./routes/analysisRoutes'));
 
