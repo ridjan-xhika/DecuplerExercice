@@ -521,11 +521,12 @@ function extractRankingPosition(text, targetBrand) {
 
 /**
  * Analyze all AI responses for a domain
- * Now includes ranking extraction and separate stats for brand vs discovery queries
+ * Now includes ranking extraction, separate stats for brand vs discovery queries,
+ * and DYNAMIC competitor detection from AI responses
  */
 async function analyzeAllResponses(responses, targetBrand) {
   // Brand query types - these mention the brand directly
-  const brandQueryTypes = ['directBrand', 'brandOpinion', 'comparison'];
+  const brandQueryTypes = ['directBrand', 'brandOpinion', 'comparison', 'competitorDiscovery'];
   // Discovery query types - these DON'T mention the brand
   const discoveryQueryTypes = ['productDiscovery', 'bestQueries', 'ranking', 'useCase', 'audienceSpecific', 'pricing', 'regional'];
 
@@ -535,7 +536,8 @@ async function analyzeAllResponses(responses, targetBrand) {
     totalMentions: 0,
     top1Count: 0,
     top3Count: 0,
-    competitorCounts: {},
+    competitorCounts: {},    // Dynamic counts from ALL responses
+    aiIdentifiedCompetitors: [], // Competitors directly from AI when asked
     analyses: [],
     
     // Separate stats for brand queries vs discovery queries
@@ -593,21 +595,32 @@ async function analyzeAllResponses(responses, targetBrand) {
       if (analysis.targetBrand.position <= 3) results.top3Count++;
     }
 
-    // Track competitor frequencies from ALL responses
+    // === COMPETITOR DISCOVERY FROM AI ===
+    // If this is a competitorDiscovery query, parse the direct AI response
+    if (queryType === 'competitorDiscovery') {
+      const aiCompetitors = parseCompetitorDiscoveryResponse(response.response_text, targetBrand);
+      for (const comp of aiCompetitors) {
+        // Add to AI-identified list with rank
+        const existing = results.aiIdentifiedCompetitors.find(c => c.name.toLowerCase() === comp.name.toLowerCase());
+        if (!existing) {
+          results.aiIdentifiedCompetitors.push(comp);
+        }
+        // Also count in general competitor counts
+        results.competitorCounts[comp.name] = (results.competitorCounts[comp.name] || 0) + 2; // Extra weight for direct AI identification
+      }
+    }
+
+    // === DYNAMIC BRAND EXTRACTION FROM ALL RESPONSES ===
+    // Extract any brand-like names from ALL responses (not just from hardcoded lists)
+    const extractedBrands = extractBrandsFromResponse(response.response_text, targetBrand);
+    for (const brand of extractedBrands) {
+      results.competitorCounts[brand.name] = (results.competitorCounts[brand.name] || 0) + brand.count;
+    }
+
+    // Also track competitors from traditional analysis
     for (const comp of analysis.competitors) {
       results.competitorCounts[comp.competitor_name] = 
         (results.competitorCounts[comp.competitor_name] || 0) + 1;
-    }
-
-    // Also scan response text for known competitors if none were found
-    if (analysis.competitors.length === 0) {
-      const industryCompetitors = getIndustryCompetitors(targetBrand);
-      const responseLower = response.response_text.toLowerCase();
-      for (const comp of industryCompetitors) {
-        if (responseLower.includes(comp.toLowerCase())) {
-          results.competitorCounts[comp] = (results.competitorCounts[comp] || 0) + 1;
-        }
-      }
     }
 
     // Extract ranking if this is a ranking query
@@ -640,11 +653,32 @@ async function analyzeAllResponses(responses, targetBrand) {
     results.rankings.worstRank = Math.max(...positions);
   }
 
-  // Sort competitors by frequency
-  results.topCompetitors = Object.entries(results.competitorCounts)
+  // Sort competitors by frequency - merge AI-identified with dynamic extraction
+  // AI-identified competitors get priority placement
+  const competitorList = Object.entries(results.competitorCounts)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
-    .map(([name, count]) => ({ name, count }));
+    .slice(0, 15);
+  
+  results.topCompetitors = competitorList.map(([name, count]) => {
+    // Check if this was directly identified by AI
+    const aiIdentified = results.aiIdentifiedCompetitors.find(c => c.name.toLowerCase() === name.toLowerCase());
+    return {
+      name,
+      count,
+      aiRank: aiIdentified?.rank || null,
+      source: aiIdentified ? 'ai_identified' : 'extracted'
+    };
+  });
+  
+  // Sort: AI-identified first (by their rank), then others by count
+  results.topCompetitors.sort((a, b) => {
+    if (a.aiRank && b.aiRank) return a.aiRank - b.aiRank;
+    if (a.aiRank) return -1;
+    if (b.aiRank) return 1;
+    return b.count - a.count;
+  });
+  
+  results.topCompetitors = results.topCompetitors.slice(0, 10);
 
   return results;
 }
@@ -660,6 +694,169 @@ function isTargetMentioned(text, targetBrand) {
   return regex.test(text);
 }
 
+/**
+ * DYNAMIC BRAND EXTRACTION
+ * Extract potential brand/company names from AI responses without relying on hardcoded lists
+ * Uses patterns like capitalized words, proper nouns, and common brand indicators
+ * @param {string} text - Response text
+ * @param {string} targetBrand - The brand we're tracking (to exclude)
+ * @returns {Array} Array of {name, count, position} for each brand found
+ */
+function extractBrandsFromResponse(text, targetBrand) {
+  const brandCandidates = new Map();
+  const targetLower = targetBrand.toLowerCase();
+  
+  // Pattern 1: Capitalized words/phrases (common brand format)
+  // Matches: Nike, Under Armour, Coca-Cola, McDonald's
+  const capitalizedPattern = /\b([A-Z][a-zA-Z'\-]+(?:\s+[A-Z][a-zA-Z'\-]+)*)\b/g;
+  
+  // Pattern 2: Numbered/bulleted list items (often contain brand names)
+  const listItemPattern = /(?:^|\n)\s*(?:\d+[.\)\-:]|[\*\-•])\s*\**([^\n:]+?)(?:\**\s*[:\-–]|\n|$)/gm;
+  
+  // Pattern 3: Common brand indicators
+  const brandIndicatorPattern = /(?:brands?|companies?|competitors?|alternatives?|options?)(?:[^:]*?:)?\s*([A-Z][^.\n]{10,100})/gi;
+  
+  // Words to exclude (common words that aren't brands)
+  const excludeWords = new Set([
+    'the', 'and', 'for', 'with', 'that', 'this', 'from', 'are', 'was', 'were', 'been',
+    'have', 'has', 'had', 'will', 'would', 'could', 'should', 'may', 'might', 'must',
+    'best', 'top', 'great', 'good', 'better', 'first', 'second', 'third', 'new', 'old',
+    'here', 'there', 'where', 'when', 'what', 'which', 'who', 'how', 'why',
+    'some', 'many', 'most', 'other', 'each', 'every', 'both', 'few', 'more', 'less',
+    'also', 'just', 'only', 'even', 'still', 'already', 'always', 'never', 'often',
+    'very', 'really', 'quite', 'rather', 'pretty', 'fairly', 'highly', 'extremely',
+    'however', 'therefore', 'furthermore', 'moreover', 'although', 'because', 'since',
+    'while', 'whereas', 'unless', 'until', 'after', 'before', 'during', 'through',
+    'above', 'below', 'between', 'among', 'within', 'without', 'against', 'toward',
+    'key', 'main', 'major', 'primary', 'secondary', 'core', 'central', 'essential',
+    'important', 'significant', 'notable', 'leading', 'popular', 'famous', 'known',
+    'overall', 'general', 'specific', 'particular', 'certain', 'various', 'different',
+    'similar', 'same', 'like', 'such', 'these', 'those', 'another', 'others',
+    'user', 'users', 'customer', 'customers', 'people', 'team', 'teams', 'company', 'companies',
+    'product', 'products', 'service', 'services', 'platform', 'platforms', 'app', 'apps',
+    'market', 'industry', 'sector', 'space', 'area', 'field', 'domain', 'niche',
+    'price', 'pricing', 'cost', 'value', 'quality', 'features', 'feature', 'option', 'options',
+    'conclusion', 'summary', 'introduction', 'overview', 'comparison', 'review', 'reviews',
+    'pros', 'cons', 'advantages', 'disadvantages', 'benefits', 'drawbacks', 'strengths', 'weaknesses'
+  ]);
+  
+  // Extract from capitalized patterns
+  let match;
+  while ((match = capitalizedPattern.exec(text)) !== null) {
+    const candidate = match[1].trim();
+    const candidateLower = candidate.toLowerCase();
+    
+    // Skip if it's the target brand or a common word
+    if (candidateLower === targetLower || 
+        candidateLower.includes(targetLower) || 
+        targetLower.includes(candidateLower) ||
+        excludeWords.has(candidateLower) ||
+        candidate.length < 2 ||
+        candidate.length > 50) {
+      continue;
+    }
+    
+    // Track position and count
+    if (!brandCandidates.has(candidateLower)) {
+      brandCandidates.set(candidateLower, {
+        name: candidate,
+        count: 0,
+        firstPosition: match.index
+      });
+    }
+    brandCandidates.get(candidateLower).count++;
+  }
+  
+  // Extract from list items (higher confidence)
+  while ((match = listItemPattern.exec(text)) !== null) {
+    const listItem = match[1].trim();
+    // Extract first capitalized phrase from list item
+    const brandMatch = listItem.match(/^([A-Z][a-zA-Z'\-]+(?:\s+[A-Z][a-zA-Z'\-]+)?)/)
+    if (brandMatch) {
+      const candidate = brandMatch[1].trim();
+      const candidateLower = candidate.toLowerCase();
+      
+      if (candidateLower !== targetLower && 
+          !excludeWords.has(candidateLower) &&
+          candidate.length >= 2) {
+        if (!brandCandidates.has(candidateLower)) {
+          brandCandidates.set(candidateLower, {
+            name: candidate,
+            count: 0,
+            firstPosition: match.index
+          });
+        }
+        // List items get extra weight
+        brandCandidates.get(candidateLower).count += 2;
+      }
+    }
+  }
+  
+  // Convert to array and sort by count (most mentioned first)
+  const results = Array.from(brandCandidates.values())
+    .filter(b => b.count >= 1) // Must appear at least once
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 15); // Top 15 candidates
+  
+  // Assign rank positions
+  return results.map((b, index) => ({
+    name: b.name,
+    count: b.count,
+    rank: index + 1
+  }));
+}
+
+/**
+ * Parse competitor discovery response to extract AI-identified competitors
+ * @param {string} responseText - AI response to competitor query
+ * @param {string} targetBrand - The target brand
+ * @returns {Array} List of competitors with their rank
+ */
+function parseCompetitorDiscoveryResponse(responseText, targetBrand) {
+  const competitors = [];
+  const targetLower = targetBrand.toLowerCase();
+  
+  // Look for numbered list items first (most reliable)
+  const numberedPattern = /(\d+)[.\)\-:]\s*\**([A-Za-z][A-Za-z\s'\-]+?)\**(?:\s*[:\-–]|\s|$)/gm;
+  let match;
+  
+  while ((match = numberedPattern.exec(responseText)) !== null) {
+    const rank = parseInt(match[1]);
+    const name = match[2].trim().replace(/\*+/g, '');
+    const nameLower = name.toLowerCase();
+    
+    if (nameLower !== targetLower && 
+        !nameLower.includes(targetLower) && 
+        !targetLower.includes(nameLower) &&
+        name.length >= 2 && name.length <= 50 &&
+        rank <= 10) {
+      competitors.push({ name, rank, source: 'ai_direct' });
+    }
+  }
+  
+  // Fallback to bullet points if no numbered list
+  if (competitors.length === 0) {
+    const bulletPattern = /^[\*\-•]\s*\**([A-Z][A-Za-z\s'\-]+?)\**(?:\s*[:\-–]|\s|$)/gm;
+    let rank = 1;
+    
+    while ((match = bulletPattern.exec(responseText)) !== null) {
+      const name = match[1].trim().replace(/\*+/g, '');
+      const nameLower = name.toLowerCase();
+      
+      if (nameLower !== targetLower && 
+          !nameLower.includes(targetLower) && 
+          !targetLower.includes(nameLower) &&
+          name.length >= 2 && name.length <= 50) {
+        competitors.push({ name, rank, source: 'ai_direct' });
+        rank++;
+      }
+      if (rank > 10) break;
+    }
+  }
+  
+  return competitors.slice(0, 10);
+}
+
 module.exports = {
   findBrandMentions,
   analyzeResponse,
@@ -668,5 +865,7 @@ module.exports = {
   detectBrandIndustry,
   getIndustryCompetitors,
   extractRankingPosition,
+  extractBrandsFromResponse,
+  parseCompetitorDiscoveryResponse,
   INDUSTRY_COMPETITORS
 };

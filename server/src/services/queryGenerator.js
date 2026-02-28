@@ -109,6 +109,19 @@ const QUERY_TEMPLATES = {
   ],
 
   // =============================================================================
+  // COMPETITOR DISCOVERY - Ask AI directly who the competitors are
+  // This replaces hardcoded competitor lists!
+  // =============================================================================
+  
+  competitorDiscovery: [
+    "Who are the top 5 competitors of {brand} in the {industry} industry?",
+    "What are the main competitors of {brand}?",
+    "List {brand}'s biggest competitors",
+    "Who competes with {brand}?",
+    "What companies compete directly with {brand}?"
+  ],
+
+  // =============================================================================
   // PRICING QUERIES - Mix of brand and non-brand
   // =============================================================================
   
@@ -460,7 +473,11 @@ function generateEnhancedQueries(brand, analysis, options = {}) {
   // 2. BRAND OPINION QUERIES - "How do you rate {brand}?" (3 queries)
   addQueries(QUERY_TEMPLATES.brandOpinion, 'brandOpinion', 3);
 
-  // 3. COMPETITOR COMPARISONS - "{brand} vs {competitor}?" (up to 4 queries)
+  // 3. COMPETITOR DISCOVERY - Ask AI directly for competitors (2 queries)
+  // This replaces hardcoded competitor lists!
+  addQueries(QUERY_TEMPLATES.competitorDiscovery, 'competitorDiscovery', 2);
+
+  // 4. COMPETITOR COMPARISONS - "{brand} vs {competitor}?" (up to 4 queries)
   if (topCompetitors.length > 0) {
     const competitorsToCompare = topCompetitors.slice(0, 2);
     for (const competitor of competitorsToCompare) {
@@ -556,6 +573,17 @@ function generateQueries(brand, industry = 'general', options = {}) {
         .replace(/{brand}/g, brand)
         .replace(/{productAction}/g, productAction),
       queryType: 'brandOpinion'
+    });
+  }
+
+  // PRIORITY 2.5: COMPETITOR DISCOVERY - Ask AI directly who competitors are
+  const competitorDiscoveryTemplates = QUERY_TEMPLATES.competitorDiscovery || [];
+  for (let i = 0; i < Math.min(2, competitorDiscoveryTemplates.length); i++) {
+    queries.push({
+      queryText: competitorDiscoveryTemplates[i]
+        .replace(/{brand}/g, brand)
+        .replace(/{industry}/g, industry),
+      queryType: 'competitorDiscovery'
     });
   }
 
