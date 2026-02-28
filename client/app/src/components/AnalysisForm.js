@@ -15,15 +15,12 @@ function AnalysisForm({ onAnalyze, loading }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (domain.trim()) {
+      // Pass strings to backend - it will parse them
       const options = {
         industry: advancedOptions.industry.trim() || null,
         targetAudience: advancedOptions.targetAudience.trim() || null,
-        mainUseCases: advancedOptions.mainUseCases.trim() 
-          ? advancedOptions.mainUseCases.split(',').map(s => s.trim()).filter(Boolean)
-          : null,
-        knownCompetitors: advancedOptions.knownCompetitors.trim()
-          ? advancedOptions.knownCompetitors.split(',').map(s => s.trim()).filter(Boolean)
-          : null,
+        mainUseCases: advancedOptions.mainUseCases.trim() || null,
+        knownCompetitors: advancedOptions.knownCompetitors.trim() || null,
         productDescription: advancedOptions.productDescription.trim() || null,
         region: advancedOptions.region
       };

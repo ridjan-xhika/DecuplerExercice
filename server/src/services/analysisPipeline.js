@@ -15,11 +15,21 @@ const { Competitor } = require('../models');
 /**
  * Run full analysis pipeline for a domain
  * @param {string} domainName - The domain/brand name to analyze
- * @param {object} options - Pipeline options
+ * @param {object} options - Pipeline options including user-provided context
  * @returns {object} Complete analysis report
  */
 async function runFullAnalysis(domainName, options = {}) {
-  const { industry, queryOptions = {}, useAIQueries = true } = options;
+  const { 
+    industry, 
+    queryOptions = {}, 
+    useAIQueries = true,
+    // Enhanced user context options
+    targetAudience,
+    mainUseCases,
+    knownCompetitors,
+    productDescription,
+    region
+  } = options;
 
   const report = {
     domain: null,
@@ -32,6 +42,7 @@ async function runFullAnalysis(domainName, options = {}) {
     trend: null,
     recommendations: [],
     topCompetitors: [],
+    userContext: { targetAudience, mainUseCases, knownCompetitors, productDescription, region },
     timestamp: new Date().toISOString()
   };
 
@@ -42,17 +53,41 @@ async function runFullAnalysis(domainName, options = {}) {
     report.domain = domain;
 
     // Step 2: Analyze company with AI to get industry, competitors, use cases
+    // Pass user-provided context for better analysis
     let queries;
     let companyAnalysis = null;
     
+    // Build enhanced query options with user context
+    const enhancedQueryOptions = {
+      ...queryOptions,
+      targetAudience,
+      mainUseCases,
+      knownCompetitors,
+      productDescription,
+      region,
+      queriesPerType: 3,
+      maxTotalQueries: 35
+    };
+    
     if (useAIQueries) {
       console.log(`Running AI company analysis for ${domainName}...`);
-      companyAnalysis = await analyzeCompanyWithAI(domainName);
+      console.log(`User context:`, { targetAudience, mainUseCases, knownCompetitors, productDescription, region });
+      
+      // Pass user context to AI analysis
+      companyAnalysis = await analyzeCompanyWithAI(domainName, {
+        industry,
+        targetAudience,
+        mainUseCases: mainUseCases ? mainUseCases.split(',').map(s => s.trim()).filter(Boolean) : [],
+        knownCompetitors: knownCompetitors ? knownCompetitors.split(',').map(s => s.trim()).filter(Boolean) : [],
+        productDescription,
+        region
+      });
       report.companyAnalysis = companyAnalysis;
       
       if (companyAnalysis) {
         console.log(`AI detected industry: ${companyAnalysis.industry}`);
         console.log(`AI detected competitors: ${companyAnalysis.topCompetitors?.join(', ')}`);
+        console.log(`AI detected use cases: ${companyAnalysis.mainUseCases?.join(', ')}`);
         
         // Update domain industry if AI detected one
         if (companyAnalysis.industry && companyAnalysis.industry !== resolvedIndustry) {
@@ -61,11 +96,11 @@ async function runFullAnalysis(domainName, options = {}) {
         }
       }
       
-      // Generate queries using AI analysis
-      queries = await generateQueriesWithAI(domainName, resolvedIndustry, queryOptions);
+      // Generate queries using AI analysis and user context
+      queries = await generateQueriesWithAI(domainName, resolvedIndustry, enhancedQueryOptions);
       report.queries.aiEnhanced = true;
     } else {
-      queries = generateQueries(domainName, resolvedIndustry, queryOptions);
+      queries = generateQueries(domainName, resolvedIndustry, enhancedQueryOptions);
       report.queries.aiEnhanced = false;
     }
     
