@@ -224,7 +224,7 @@ const BRAND_TO_INDUSTRY = {
   'zoom': 'communication', 'discord': 'communication',
   
   // E-commerce
-  'shopify': 'ecommerce', 'amazon': 'ecommerce', 'ebay': 'ecommerce', 'etsy': 'ecommerce',
+  'shopify': 'ecommerce', 'amazon': 'retail', 'ebay': 'ecommerce', 'etsy': 'ecommerce',
   
   // Cloud
   'aws': 'cloud', 'azure': 'cloud', 'google cloud': 'cloud', 'heroku': 'cloud',
@@ -234,7 +234,45 @@ const BRAND_TO_INDUSTRY = {
   'google': 'search', 'bing': 'search', 'duckduckgo': 'search',
   
   // Streaming
-  'netflix': 'streaming', 'spotify': 'streaming', 'disney+': 'streaming', 'hulu': 'streaming'
+  'netflix': 'video streaming', 'disney+': 'video streaming', 'hulu': 'video streaming',
+  'spotify': 'music streaming', 'apple music': 'music streaming', 'tidal': 'music streaming',
+  
+  // Gaming Communication
+  'discord': 'gaming communication',
+  
+  // ============ NON-TECH BRANDS ============
+  
+  // Sportswear
+  'nike': 'sportswear', 'adidas': 'sportswear', 'puma': 'sportswear',
+  'under armour': 'sportswear', 'reebok': 'sportswear', 'new balance': 'sportswear',
+  'asics': 'sportswear', 'lululemon': 'sportswear', 'fila': 'sportswear',
+  
+  // Fashion
+  'zara': 'fashion', 'h&m': 'fashion', 'uniqlo': 'fashion', 'gap': 'fashion',
+  'gucci': 'fashion', 'louis vuitton': 'fashion', 'prada': 'fashion',
+  
+  // Fast Food
+  'mcdonalds': 'fast food', 'mcdonald\'s': 'fast food', 'burger king': 'fast food',
+  'wendys': 'fast food', 'wendy\'s': 'fast food', 'taco bell': 'fast food',
+  'kfc': 'fast food', 'chick-fil-a': 'fast food', 'subway': 'fast food',
+  'chipotle': 'fast food', 'five guys': 'fast food',
+  
+  // Coffee
+  'starbucks': 'coffee', 'dunkin': 'coffee', 'peets': 'coffee',
+  'tim hortons': 'coffee', 'costa coffee': 'coffee',
+  
+  // Automotive
+  'tesla': 'automotive', 'toyota': 'automotive', 'honda': 'automotive',
+  'ford': 'automotive', 'bmw': 'automotive', 'mercedes': 'automotive',
+  'audi': 'automotive', 'chevrolet': 'automotive', 'nissan': 'automotive',
+  
+  // Travel
+  'airbnb': 'travel', 'booking': 'travel', 'expedia': 'travel',
+  'marriott': 'travel', 'hilton': 'travel',
+  
+  // Banking
+  'chase': 'banking', 'bank of america': 'banking', 'wells fargo': 'banking',
+  'capital one': 'banking', 'citi': 'banking'
 };
 
 /**
