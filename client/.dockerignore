@@ -1,0 +1,7 @@
+app/node_modules
+app/npm-debug.log
+app/.env
+app/build
+node_modules
+.git
+.gitignore
