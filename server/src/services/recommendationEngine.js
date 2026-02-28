@@ -386,35 +386,76 @@ function generateRecommendations(analysisResults, scoreData, trend = null) {
 
 /**
  * Generate AI-powered recommendations by asking the AI providers
+ * NOW BASED ON ACTUAL AI INSIGHTS - uses discovery rate, ranking data, and AI-identified competitors
  * @param {string} brandName - The brand being analyzed
  * @param {object} analysisResults - Results from analysis
  * @param {object} scoreData - Score data
- * @param {Array} topCompetitors - List of top competitors
+ * @param {Array} topCompetitors - List of top competitors (now includes AI-identified)
  * @returns {Array} AI-generated recommendations from each provider
  */
 async function generateAIRecommendations(brandName, analysisResults, scoreData, topCompetitors = []) {
   const { stats, score } = scoreData;
   
-  // Build context for AI
-  const competitorList = topCompetitors.slice(0, 5).map(c => c.name).join(', ') || 'none identified';
+  // Build richer context with new data
+  const competitorList = topCompetitors.slice(0, 5).map(c => {
+    if (c.aiRank) return `${c.name} (AI ranked #${c.aiRank})`;
+    return c.name;
+  }).join(', ') || 'none identified';
   
-  const prompt = `You are an AI visibility and SEO expert. Analyze this brand's AI visibility data and provide specific, actionable recommendations.
+  // Get discovery stats (TRUE organic visibility)
+  const discoveryStats = stats.discoveryQueries || { mentionRate: 0, total: 0, mentioned: 0 };
+  const brandQueryStats = stats.brandQueries || { mentionRate: 0, total: 0, mentioned: 0 };
+  const rankingStats = stats.ranking || null;
+  
+  // Build insight summary based on actual data
+  let keyInsights = [];
+  
+  if (discoveryStats.mentionRate < 20) {
+    keyInsights.push(`CRITICAL: Brand only appears in ${discoveryStats.mentionRate}% of organic discovery queries (when users DON'T mention the brand)`);
+  } else if (discoveryStats.mentionRate < 50) {
+    keyInsights.push(`Brand appears in ${discoveryStats.mentionRate}% of organic discovery queries - room for improvement`);
+  } else {
+    keyInsights.push(`STRONG: Brand appears in ${discoveryStats.mentionRate}% of organic discovery queries`);
+  }
+  
+  if (rankingStats && rankingStats.bestRank) {
+    if (rankingStats.bestRank > 5) {
+      keyInsights.push(`AI ranks brand #${rankingStats.bestRank} at best - not in top 5`);
+    } else if (rankingStats.bestRank > 1) {
+      keyInsights.push(`AI ranks brand #${rankingStats.bestRank} - close to #1 but not there yet`);
+    } else {
+      keyInsights.push(`AI ranks brand #1 in some queries - strong position`);
+    }
+  }
+  
+  if (brandQueryStats.mentionRate < 80) {
+    keyInsights.push(`Warning: AI only recognizes brand in ${brandQueryStats.mentionRate}% of direct brand queries`);
+  }
+  
+  const prompt = `You are an AI visibility expert. Analyze this brand's REAL AI visibility data and provide specific recommendations.
 
 Brand: ${brandName}
-Current AI Visibility Score: ${score}/100
-Mention Rate: ${stats.mentionRate}% (brand mentioned in ${stats.totalMentions} of ${stats.totalQueries} AI responses)
-Top 1 Positions: ${stats.top1Count}
-Top 3 Positions: ${stats.top3Count}
+
+=== KEY METRICS ===
+Overall AI Visibility Score: ${score}/100
+Organic Discovery Rate: ${discoveryStats.mentionRate}% (mentioned in ${discoveryStats.mentioned}/${discoveryStats.total} queries where brand was NOT mentioned)
+Brand Recognition Rate: ${brandQueryStats.mentionRate}% (mentioned in ${brandQueryStats.mentioned}/${brandQueryStats.total} direct brand queries)
+${rankingStats && rankingStats.bestRank ? `AI Ranking: Best #${rankingStats.bestRank}, Avg #${rankingStats.averageRank}` : 'No ranking data'}
+Top 1 Positions: ${stats.top1Count} | Top 3 Positions: ${stats.top3Count}
 Average Position When Mentioned: ${stats.avgPosition || 'N/A'}
-Top Competitors in AI Responses: ${competitorList}
 
-Based on this data, provide 3-5 specific, actionable recommendations to improve this brand's visibility in AI responses. For each recommendation:
-1. State the issue clearly
-2. Explain WHY this matters for AI visibility
-3. Provide 2-3 concrete action steps
-4. Estimate the potential impact
+=== AI-IDENTIFIED COMPETITORS ===
+${competitorList}
 
-Format your response as a numbered list. Be specific to this brand's situation - avoid generic advice.`;
+=== KEY INSIGHTS ===
+${keyInsights.map((i, idx) => `${idx + 1}. ${i}`).join('\n')}
+
+Based on this ACTUAL data, provide 3-5 specific, actionable recommendations. Focus on:
+1. WHY the brand isn't appearing more in organic discovery queries
+2. How to improve AI ranking position against the specific competitors listed
+3. Content/SEO strategies that will improve AI visibility specifically
+
+Format as numbered recommendations with concrete action steps. Be specific to this brand - reference the actual competitors and metrics shown.`;
 
   try {
     const results = await askAllProviders(prompt);

@@ -8,12 +8,21 @@ function CompetitorList({ competitors }) {
   return (
     <ul className="competitor-list">
       {competitors.map((comp, index) => (
-        <li key={index} className="competitor-item">
+        <li key={index} className={`competitor-item ${comp.aiRank ? 'ai-identified' : ''}`}>
           <span className="competitor-name">
-            {index + 1}. {comp.name || comp.competitor_name}
+            {comp.aiRank ? (
+              <>
+                <span className="ai-rank">#{comp.aiRank}</span> {comp.name || comp.competitor_name}
+              </>
+            ) : (
+              <>{index + 1}. {comp.name || comp.competitor_name}</>
+            )}
           </span>
-          <span className="competitor-count">
-            {comp.count || comp.mention_count} mentions
+          <span className="competitor-meta">
+            {comp.aiRank && <span className="ai-badge">AI Identified</span>}
+            <span className="competitor-count">
+              {comp.count || comp.mention_count} mentions
+            </span>
           </span>
         </li>
       ))}

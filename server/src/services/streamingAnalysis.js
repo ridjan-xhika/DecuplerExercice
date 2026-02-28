@@ -244,9 +244,18 @@ async function runStreamingAnalysis(domainName, options, sendEvent) {
     report.recommendations = recommendationResults.standard;
     report.aiRecommendations = recommendationResults.aiGenerated;
 
-    // Step 9: Get competitors
-    const topCompetitors = await Competitor.getTopCompetitors(domain.id, 5);
-    report.topCompetitors = topCompetitors;
+    // Step 9: Get competitors - prefer analysis results (includes AI-identified) over DB
+    // analysisResults.topCompetitors includes aiRank and source info
+    if (analysisResults.topCompetitors && analysisResults.topCompetitors.length > 0) {
+      report.topCompetitors = analysisResults.topCompetitors;
+    } else {
+      // Fallback to database competitors
+      const dbCompetitors = await Competitor.getTopCompetitors(domain.id, 5);
+      report.topCompetitors = dbCompetitors.map(c => ({
+        name: c.competitor_name,
+        count: c.mention_count || 1
+      }));
+    }
 
     // Send final complete report
     sendEvent('complete', { report });
