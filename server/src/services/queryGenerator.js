@@ -1,12 +1,14 @@
 /**
  * Query Generator Service - Enhanced Version
  * Generates comprehensive user prompts to test brand visibility in AI responses
- * Inspired by Searchable, Peec AI, and BabyLoveGrowth tools
+ * Uses SPECIFIC product/service queries, not generic "software" questions
  */
 
 const { askAllProviders } = require('./aiClient');
 
 // Comprehensive query templates by category
+// Uses {productAction} for what the product does (e.g., "stream music", "buy shoes", "order food")
+// Uses {productType} for the product category (e.g., "music streaming app", "running shoes", "burger")
 const QUERY_TEMPLATES = {
   // === DIRECT BRAND QUERIES (HIGH PRIORITY - Should always mention the brand) ===
   directBrand: [
@@ -14,11 +16,11 @@ const QUERY_TEMPLATES = {
     "Tell me about {brand}",
     "What does {brand} do?",
     "Explain what {brand} is",
-    "Give me info on {brand}",
+    "Is {brand} good for {productAction}?",
     "What is {brand} used for?",
     "Who uses {brand}?",
     "How would you describe {brand}?",
-    "What kind of company is {brand}?",
+    "What kind of {productType} is {brand}?",
     "Give me an overview of {brand}"
   ],
 
@@ -27,54 +29,54 @@ const QUERY_TEMPLATES = {
     "How do you rate {brand}?",
     "What do you think of {brand}?",
     "Is {brand} any good?",
-    "Would you recommend {brand}?",
+    "Would you recommend {brand} for {productAction}?",
     "How good is {brand}?",
     "What's your opinion on {brand}?",
     "Rate {brand} out of 10",
-    "Is {brand} worth using?",
-    "Should I try {brand}?",
+    "Is {brand} worth it?",
+    "Should I use {brand} to {productAction}?",
     "Give me your honest take on {brand}"
   ],
 
-  // === NATURAL DISCOVERY QUERIES ===
-  naturalDiscovery: [
-    "Give me some {industry} apps",
-    "Name some {industry} tools",
-    "List some {industry} companies",
-    "What are some {industry} platforms?",
-    "Show me some {industry} options",
-    "What {industry} apps exist?",
-    "Tell me about {industry} software",
-    "Give me {industry} recommendations",
-    "What {industry} services are out there?",
-    "Name a few {industry} solutions"
+  // === PRODUCT/SERVICE DISCOVERY QUERIES (What people actually search) ===
+  productDiscovery: [
+    "Where can I {productAction}?",
+    "Best way to {productAction}?",
+    "How do I {productAction}?",
+    "What app should I use to {productAction}?",
+    "Best {productType} options?",
+    "What's the best {productType}?",
+    "Looking for a {productType}",
+    "I want to {productAction}, what should I use?",
+    "Recommend a {productType}",
+    "Top {productType} right now?"
   ],
 
-  // === BEST/TOP QUERIES (Natural phrasing) ===
+  // === BEST/TOP QUERIES (Product-specific) ===
   bestQueries: [
-    "What's the best {industry} app?",
-    "Best {industry} company?",
-    "Top {industry} tools?",
-    "Who's the best in {industry}?",
-    "What's the leading {industry} platform?",
-    "Best {industry} software right now?",
-    "What's number one in {industry}?",
-    "Top rated {industry}?",
-    "Best {industry} for {targetAudience}?",
-    "Most popular {industry}?"
+    "What's the best {productType}?",
+    "Best place to {productAction}?",
+    "Top {productType} in 2024?",
+    "What's the most popular {productType}?",
+    "Best {productType} for {targetAudience}?",
+    "Which {productType} is number one?",
+    "Leading {productType}?",
+    "Top rated {productType}?",
+    "Best {productType} you'd recommend?",
+    "What's the go-to {productType}?"
   ],
 
-  // === COMPARISON QUERIES (Natural) ===
+  // === COMPARISON QUERIES ===
   comparison: [
-    "How does {brand} compare?",
-    "{brand} vs the competition?",
+    "How does {brand} compare to {competitor}?",
+    "{brand} vs {competitor}?",
     "Is {brand} better than {competitor}?",
-    "{brand} or {competitor}?",
+    "{brand} or {competitor} for {productAction}?",
     "Compare {brand} and {competitor}",
     "Which is better: {brand} or {competitor}?",
-    "{brand} vs {competitor} - which to choose?",
-    "How's {brand} compared to others?",
-    "Is {brand} competitive?"
+    "{brand} vs {competitor} - which should I choose?",
+    "Should I use {brand} or {competitor}?",
+    "Difference between {brand} and {competitor}?"
   ],
 
   // === ALTERNATIVES QUERIES ===
@@ -82,196 +84,199 @@ const QUERY_TEMPLATES = {
     "Alternatives to {brand}?",
     "What's like {brand}?",
     "Similar to {brand}?",
-    "Apps like {brand}",
+    "{productType} like {brand}",
     "What competes with {brand}?",
     "{brand} competitors?",
-    "Other options besides {brand}?",
-    "What else is there besides {brand}?",
-    "Anything better than {brand}?"
+    "Other {productType} besides {brand}?",
+    "What else can I use instead of {brand}?",
+    "Anything better than {brand} for {productAction}?"
   ],
 
-  // === USE CASE QUERIES (Natural) ===
+  // === USE CASE QUERIES ===
   useCase: [
-    "Best app for {useCase}?",
+    "Best {productType} for {useCase}?",
     "What should I use for {useCase}?",
-    "Help me with {useCase}",
+    "I need to {useCase}, what's best?",
     "What's good for {useCase}?",
-    "I need something for {useCase}",
+    "I need a {productType} for {useCase}",
     "Recommend something for {useCase}",
-    "Tools for {useCase}?",
-    "How do I handle {useCase}?",
-    "Best way to do {useCase}?"
+    "Best way to handle {useCase}?",
+    "How do I {useCase}?",
+    "Help me with {useCase}"
   ],
 
   // === PRICING QUERIES ===
   pricing: [
     "Is {brand} free?",
-    "How much is {brand}?",
+    "How much does {brand} cost?",
     "{brand} pricing?",
     "Is {brand} expensive?",
     "Does {brand} have a free plan?",
     "What does {brand} cost?",
-    "{brand} free trial?",
-    "Cheap {industry} options?",
-    "Free {industry} tools?"
+    "{brand} subscription price?",
+    "Free {productType} options?",
+    "Cheap {productType} alternatives?"
   ],
 
   // === REVIEW/RATING QUERIES ===
   review: [
     "{brand} reviews?",
     "Is {brand} legit?",
-    "{brand} worth it?",
+    "{brand} worth the money?",
     "Any issues with {brand}?",
     "Problems with {brand}?",
     "{brand} pros and cons?",
-    "Honest opinion on {brand}?",
+    "Honest review of {brand}?",
     "What's wrong with {brand}?",
-    "Is {brand} reliable?"
+    "Is {brand} reliable for {productAction}?"
   ],
 
   // === AUDIENCE-SPECIFIC QUERIES ===
   audienceSpecific: [
-    "Best {industry} for startups?",
-    "{industry} for small business?",
-    "Enterprise {industry} solutions?",
-    "{industry} for developers?",
-    "Easy {industry} for beginners?",
-    "{industry} for freelancers?",
-    "Simple {industry} tools?",
-    "Best {industry} for teams?"
+    "Best {productType} for beginners?",
+    "{productType} for professionals?",
+    "Best {productType} for {targetAudience}?",
+    "{productType} for kids?",
+    "Easy {productType} to use?",
+    "{productType} for casual users?",
+    "Premium {productType} options?",
+    "Best {productType} for families?"
   ],
 
   // === REGIONAL QUERIES ===
   regional: [
-    "Best {industry} in {region}?",
-    "{industry} for {region}?",
+    "Best {productType} in {region}?",
+    "{productType} available in {region}?",
     "Is {brand} available in {region}?",
-    "Top {industry} companies in {region}?",
-    "{region} {industry} options?"
+    "Top {productType} in {region}?",
+    "Where to {productAction} in {region}?"
   ]
 };
 
-// Extended use cases by industry
-const INDUSTRY_USE_CASES = {
-  'social media': [
-    'social media management', 'content scheduling', 'community engagement',
-    'influencer tracking', 'social listening', 'analytics and reporting',
-    'cross-platform posting', 'hashtag research', 'audience growth',
-    'social commerce', 'user engagement', 'brand monitoring'
-  ],
-  'crm': [
-    'sales tracking', 'customer management', 'lead generation', 'pipeline management',
-    'contact management', 'deal tracking', 'sales forecasting', 'customer segmentation',
-    'relationship management', 'sales automation', 'email tracking', 'meeting scheduling'
-  ],
-  'project management': [
-    'team collaboration', 'task tracking', 'agile workflows', 'resource planning',
-    'sprint planning', 'gantt charts', 'time tracking', 'milestone tracking',
-    'project templates', 'workload management', 'deadline management', 'team coordination'
-  ],
-  'marketing': [
-    'email campaigns', 'social media management', 'content creation', 'analytics',
-    'marketing automation', 'lead nurturing', 'A/B testing', 'campaign tracking',
-    'audience segmentation', 'ROI tracking', 'landing pages', 'conversion optimization'
-  ],
-  'ecommerce': [
-    'online store', 'payment processing', 'inventory management', 'dropshipping',
-    'order fulfillment', 'product catalog', 'shopping cart', 'checkout optimization',
-    'customer reviews', 'multi-channel selling', 'shipping management', 'returns processing'
-  ],
-  'analytics': [
-    'data visualization', 'reporting', 'business intelligence', 'metrics tracking',
-    'dashboard creation', 'data analysis', 'KPI tracking', 'custom reports',
-    'data integration', 'predictive analytics', 'user behavior analysis', 'conversion tracking'
-  ],
-  'communication': [
-    'team chat', 'video conferencing', 'async communication', 'file sharing',
-    'screen sharing', 'voice calls', 'team channels', 'direct messaging',
-    'meeting scheduling', 'remote collaboration', 'webinars', 'live streaming'
-  ],
-  'development': [
-    'code hosting', 'CI/CD', 'code review', 'deployment',
-    'version control', 'issue tracking', 'pull requests', 'automated testing',
-    'container orchestration', 'infrastructure as code', 'API development', 'debugging'
-  ],
-  'design': [
-    'UI design', 'prototyping', 'design collaboration', 'asset management',
-    'wireframing', 'design systems', 'handoff to developers', 'user testing',
-    'brand guidelines', 'responsive design', 'icon design', 'illustration'
-  ],
-  'hr': [
-    'recruiting', 'onboarding', 'performance reviews', 'payroll',
-    'employee engagement', 'time off tracking', 'benefits administration',
-    'talent management', 'employee directory', 'compliance tracking', 'training', 'surveys'
-  ],
-  'finance': [
-    'invoicing', 'expense tracking', 'accounting', 'budgeting',
-    'financial reporting', 'tax preparation', 'cash flow management',
-    'accounts payable', 'accounts receivable', 'financial forecasting', 'payroll', 'billing'
-  ],
-  'customer support': [
-    'help desk', 'ticket management', 'live chat', 'knowledge base',
-    'customer feedback', 'support automation', 'SLA tracking', 'multi-channel support',
-    'customer satisfaction', 'agent performance', 'chatbots', 'FAQ management'
-  ],
-  'ai/ml': [
-    'machine learning', 'model training', 'data labeling', 'inference',
-    'natural language processing', 'computer vision', 'prediction', 'classification',
-    'generative AI', 'chatbot development', 'AI automation', 'model deployment'
-  ],
-  'cybersecurity': [
-    'threat detection', 'vulnerability scanning', 'identity management', 'encryption',
-    'penetration testing', 'security monitoring', 'compliance', 'incident response',
-    'access control', 'firewall management', 'endpoint protection', 'security audits'
-  ],
-  'cloud computing': [
-    'cloud hosting', 'serverless', 'container orchestration', 'cloud storage',
-    'auto-scaling', 'load balancing', 'database management', 'backup and recovery',
-    'cloud migration', 'cost optimization', 'multi-cloud', 'edge computing'
-  ],
-  // NON-TECH INDUSTRIES
-  'sportswear': [
-    'running shoes', 'athletic apparel', 'sports equipment', 'workout gear',
-    'training shoes', 'athletic footwear', 'sports clothing', 'fitness apparel',
-    'basketball shoes', 'soccer cleats', 'gym wear', 'activewear'
-  ],
-  'fashion': [
-    'clothing', 'apparel', 'accessories', 'shoes', 'luxury fashion',
-    'streetwear', 'designer clothes', 'affordable fashion', 'sustainable fashion'
-  ],
-  'food & beverage': [
-    'fast food', 'restaurants', 'coffee shops', 'delivery', 'beverages',
-    'snacks', 'organic food', 'meal kits', 'grocery', 'drinks'
-  ],
-  'automotive': [
-    'cars', 'vehicles', 'electric vehicles', 'SUVs', 'trucks',
-    'car buying', 'auto financing', 'car maintenance', 'driving'
-  ],
-  'retail': [
-    'online shopping', 'stores', 'products', 'deals', 'discounts',
-    'home goods', 'electronics', 'shopping experience', 'customer service'
-  ],
-  'entertainment': [
-    'streaming', 'movies', 'TV shows', 'music', 'gaming',
-    'live events', 'concerts', 'sports viewing', 'content'
-  ],
-  'travel': [
-    'flights', 'hotels', 'vacation', 'booking', 'travel deals',
-    'destinations', 'travel planning', 'airlines', 'accommodations'
-  ],
-  'healthcare': [
-    'health services', 'medical care', 'wellness', 'fitness',
-    'mental health', 'telemedicine', 'health insurance', 'pharmacy'
-  ],
-  'banking': [
-    'checking accounts', 'savings', 'loans', 'credit cards',
-    'mobile banking', 'investments', 'mortgages', 'financial services'
-  ],
-  'default': [
-    'products', 'services', 'quality', 'customer experience',
-    'value', 'reliability', 'innovation', 'brand'
-  ]
+// Industry-specific product information
+// Each industry has: productTypes (what the product IS), productActions (what users DO with it), useCases (specific scenarios)
+const INDUSTRY_DATA = {
+  // === TECH INDUSTRIES ===
+  'music streaming': {
+    productTypes: ['music streaming app', 'music app', 'music service', 'music platform', 'audio streaming service'],
+    productActions: ['listen to music', 'stream music', 'discover new songs', 'create playlists', 'download music offline'],
+    useCases: ['listening to music', 'discovering new artists', 'creating playlists', 'listening offline', 'sharing music']
+  },
+  'video streaming': {
+    productTypes: ['streaming service', 'video streaming app', 'streaming platform', 'TV streaming service', 'movie streaming app'],
+    productActions: ['watch movies', 'stream TV shows', 'watch videos', 'binge watch shows', 'stream content'],
+    useCases: ['watching movies', 'binge watching TV shows', 'streaming live TV', 'family movie nights', 'watching documentaries']
+  },
+  'gaming communication': {
+    productTypes: ['gaming chat app', 'voice chat app', 'gaming community platform', 'gamer chat', 'team voice chat'],
+    productActions: ['chat while gaming', 'voice chat with friends', 'join gaming communities', 'talk to teammates', 'stream to friends'],
+    useCases: ['gaming with friends', 'voice chat during games', 'running a gaming server', 'streaming gameplay', 'team coordination']
+  },
+  'social media': {
+    productTypes: ['social media app', 'social network', 'social platform', 'community platform', 'photo sharing app'],
+    productActions: ['share photos', 'connect with friends', 'post updates', 'follow people', 'share content'],
+    useCases: ['sharing photos', 'staying connected', 'following influencers', 'posting stories', 'networking']
+  },
+  'crm': {
+    productTypes: ['CRM software', 'sales CRM', 'customer management tool', 'sales platform', 'CRM system'],
+    productActions: ['manage customer relationships', 'track sales', 'manage leads', 'close deals', 'track prospects'],
+    useCases: ['sales tracking', 'lead management', 'customer management', 'pipeline management', 'deal tracking']
+  },
+  'project management': {
+    productTypes: ['project management tool', 'task manager', 'team collaboration app', 'work management platform', 'productivity app'],
+    productActions: ['manage projects', 'track tasks', 'collaborate with team', 'organize work', 'plan sprints'],
+    useCases: ['team collaboration', 'task tracking', 'project planning', 'sprint management', 'deadline tracking']
+  },
+  'marketing': {
+    productTypes: ['email marketing tool', 'marketing automation platform', 'marketing software', 'campaign manager', 'marketing app'],
+    productActions: ['send email campaigns', 'automate marketing', 'track campaigns', 'grow audience', 'nurture leads'],
+    useCases: ['email campaigns', 'marketing automation', 'lead nurturing', 'campaign tracking', 'audience growth']
+  },
+  'ecommerce': {
+    productTypes: ['ecommerce platform', 'online store builder', 'shopping platform', 'store builder', 'online shop'],
+    productActions: ['sell online', 'build an online store', 'accept payments', 'manage inventory', 'ship products'],
+    useCases: ['selling products online', 'building a store', 'payment processing', 'inventory management', 'dropshipping']
+  },
+  'communication': {
+    productTypes: ['team chat app', 'messaging app', 'video conferencing tool', 'collaboration platform', 'work chat'],
+    productActions: ['chat with team', 'video call', 'send messages', 'share files', 'host meetings'],
+    useCases: ['team communication', 'video meetings', 'remote collaboration', 'file sharing', 'async communication']
+  },
+  'development': {
+    productTypes: ['code hosting platform', 'developer tool', 'version control', 'CI/CD platform', 'code repository'],
+    productActions: ['host code', 'collaborate on code', 'deploy apps', 'manage repositories', 'review code'],
+    useCases: ['code hosting', 'version control', 'CI/CD', 'code review', 'deployment']
+  },
+  'design': {
+    productTypes: ['design tool', 'UI design app', 'prototyping tool', 'graphic design software', 'design platform'],
+    productActions: ['design interfaces', 'create prototypes', 'collaborate on designs', 'make graphics', 'edit images'],
+    useCases: ['UI design', 'prototyping', 'graphic design', 'design collaboration', 'wireframing']
+  },
+  'finance': {
+    productTypes: ['accounting software', 'finance app', 'invoicing tool', 'payment platform', 'bookkeeping software'],
+    productActions: ['send invoices', 'track expenses', 'manage finances', 'accept payments', 'do bookkeeping'],
+    useCases: ['invoicing', 'expense tracking', 'accounting', 'payment processing', 'financial reporting']
+  },
+  'customer support': {
+    productTypes: ['help desk software', 'customer support platform', 'ticketing system', 'live chat tool', 'support app'],
+    productActions: ['handle support tickets', 'chat with customers', 'manage help desk', 'provide support', 'track issues'],
+    useCases: ['customer support', 'ticket management', 'live chat support', 'help desk', 'customer service']
+  },
+  
+  // === NON-TECH INDUSTRIES ===
+  'sportswear': {
+    productTypes: ['running shoes', 'athletic shoes', 'sports brand', 'athletic apparel', 'workout clothes', 'sneakers'],
+    productActions: ['buy running shoes', 'shop for athletic wear', 'get workout clothes', 'buy sneakers', 'find sports gear'],
+    useCases: ['running', 'working out', 'playing basketball', 'training', 'playing sports', 'going to the gym']
+  },
+  'fashion': {
+    productTypes: ['clothing brand', 'fashion brand', 'apparel store', 'fashion retailer', 'clothing store'],
+    productActions: ['buy clothes', 'shop for fashion', 'find outfits', 'shop online for clothes', 'buy designer clothes'],
+    useCases: ['shopping for clothes', 'finding trendy outfits', 'dressing well', 'buying affordable fashion', 'sustainable fashion']
+  },
+  'fast food': {
+    productTypes: ['fast food restaurant', 'burger place', 'fast food chain', 'quick service restaurant', 'food chain'],
+    productActions: ['order food', 'get fast food', 'grab a burger', 'order delivery', 'eat out'],
+    useCases: ['quick meals', 'food delivery', 'drive-through', 'late night food', 'cheap eats']
+  },
+  'coffee': {
+    productTypes: ['coffee shop', 'coffee chain', 'cafe', 'coffee brand', 'coffee place'],
+    productActions: ['get coffee', 'order coffee', 'grab a latte', 'buy coffee', 'find a cafe'],
+    useCases: ['morning coffee', 'working from a cafe', 'meeting friends for coffee', 'grabbing coffee on the go']
+  },
+  'automotive': {
+    productTypes: ['car brand', 'car company', 'vehicle manufacturer', 'auto brand', 'electric car company'],
+    productActions: ['buy a car', 'shop for cars', 'lease a vehicle', 'find a car', 'compare cars'],
+    useCases: ['buying a new car', 'finding an electric vehicle', 'car shopping', 'comparing car brands', 'test driving']
+  },
+  'retail': {
+    productTypes: ['online store', 'retailer', 'shopping site', 'ecommerce store', 'marketplace'],
+    productActions: ['shop online', 'buy products', 'order things', 'find deals', 'buy stuff'],
+    useCases: ['online shopping', 'finding deals', 'buying electronics', 'home shopping', 'quick delivery']
+  },
+  'travel': {
+    productTypes: ['travel booking site', 'hotel booking app', 'vacation rental', 'travel platform', 'booking service'],
+    productActions: ['book a hotel', 'find accommodation', 'book travel', 'find vacation rentals', 'plan a trip'],
+    useCases: ['booking hotels', 'planning vacations', 'finding accommodations', 'travel planning', 'booking flights']
+  },
+  'banking': {
+    productTypes: ['bank', 'financial institution', 'banking app', 'online bank', 'credit card company'],
+    productActions: ['open a bank account', 'manage money', 'apply for credit card', 'transfer money', 'check balance'],
+    useCases: ['online banking', 'managing finances', 'getting a credit card', 'savings', 'loans']
+  },
+  
+  // Default fallback
+  'general': {
+    productTypes: ['company', 'brand', 'service', 'product', 'platform'],
+    productActions: ['use their service', 'buy their products', 'try them out', 'check them out', 'use them'],
+    useCases: ['general use', 'everyday needs', 'getting things done', 'finding solutions']
+  }
 };
+
+// Legacy use cases mapping (for backward compatibility)
+const INDUSTRY_USE_CASES = Object.fromEntries(
+  Object.entries(INDUSTRY_DATA).map(([key, data]) => [key, data.useCases])
+);
 
 // Target audiences for queries
 const TARGET_AUDIENCES = [
@@ -428,28 +433,45 @@ function generateEnhancedQueries(brand, analysis, options = {}) {
     region = null
   } = analysis;
 
-  // Helper to add queries from templates
-  const addQueries = (templates, type, count = queriesPerType, replacements = {}) => {
+  // Get industry-specific data (productTypes, productActions, useCases)
+  const industryData = INDUSTRY_DATA[industry.toLowerCase()] || INDUSTRY_DATA['general'];
+  
+  // Pick random product type and action for variety
+  const getRandomItem = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  const productType = getRandomItem(industryData.productTypes);
+  const productAction = getRandomItem(industryData.productActions);
+  
+  // Use AI-detected use cases or fall back to industry defaults
+  const useCases = mainUseCases.length > 0 ? mainUseCases : industryData.useCases;
+
+  // Helper to add queries from templates with product-specific replacements
+  const addQueries = (templates, type, count = queriesPerType, extraReplacements = {}) => {
     if (!templates) return;
     const shuffled = [...templates].sort(() => Math.random() - 0.5);
     const selected = shuffled.slice(0, count);
     
     for (const template of selected) {
+      // Pick fresh random product type/action for each query for variety
+      const thisProductType = getRandomItem(industryData.productTypes);
+      const thisProductAction = getRandomItem(industryData.productActions);
+      
       let queryText = template
         .replace(/{brand}/g, brand)
+        .replace(/{productType}/g, thisProductType)
+        .replace(/{productAction}/g, thisProductAction)
         .replace(/{industry}/g, industry)
         .replace(/{specificField}/g, specificField)
         .replace(/{targetAudience}/g, targetAudience);
       
       // Apply additional replacements
-      for (const [key, value] of Object.entries(replacements)) {
+      for (const [key, value] of Object.entries(extraReplacements)) {
         queryText = queryText.replace(new RegExp(`{${key}}`, 'g'), value);
       }
       
       queries.push({
         queryText,
         queryType: type,
-        metadata: replacements
+        metadata: { productType: thisProductType, productAction: thisProductAction, ...extraReplacements }
       });
     }
   };
@@ -461,12 +483,7 @@ function generateEnhancedQueries(brand, analysis, options = {}) {
   addQueries(QUERY_TEMPLATES.directBrand, 'directBrand', 6);
   
   // 2. BRAND OPINION QUERIES - "Should I use {brand}?" type queries (4-5 queries)
-  if (mainUseCases.length > 0) {
-    const useCase = mainUseCases[0];
-    addQueries(QUERY_TEMPLATES.brandOpinion, 'brandOpinion', 5, { useCase });
-  } else {
-    addQueries(QUERY_TEMPLATES.brandOpinion, 'brandOpinion', 5, { useCase: 'my needs' });
-  }
+  addQueries(QUERY_TEMPLATES.brandOpinion, 'brandOpinion', 5);
 
   // ============ MEDIUM PRIORITY: COMPARATIVE & DISCOVERY QUERIES ============
 
@@ -487,18 +504,18 @@ function generateEnhancedQueries(brand, analysis, options = {}) {
   // 6. PRICING QUERIES (2 queries)
   addQueries(QUERY_TEMPLATES.pricing, 'pricing', 2);
 
-  // ============ DISCOVERY QUERIES ============
-  // Natural discovery queries - "give me some apps", "best X company"
+  // ============ PRODUCT-SPECIFIC DISCOVERY QUERIES ============
+  // These ask about what users actually DO, not generic "software" questions
 
-  // 7. NATURAL DISCOVERY (5 queries) - "Give me some X apps", "Name some X tools"
-  addQueries(QUERY_TEMPLATES.naturalDiscovery, 'naturalDiscovery', 5);
+  // 7. PRODUCT DISCOVERY (6 queries) - "Where can I stream music?", "Best running shoes?"
+  addQueries(QUERY_TEMPLATES.productDiscovery, 'productDiscovery', 6);
 
-  // 8. BEST QUERIES (4 queries) - "What's the best X?", "Top X tools?"
-  addQueries(QUERY_TEMPLATES.bestQueries, 'bestQueries', 4);
+  // 8. BEST QUERIES (5 queries) - "What's the best music streaming app?", "Best place to buy sneakers?"
+  addQueries(QUERY_TEMPLATES.bestQueries, 'bestQueries', 5);
 
   // 9. USE CASE QUERIES (up to 3 queries)
-  if (mainUseCases.length > 0) {
-    const useCasesToQuery = mainUseCases.slice(0, 3);
+  if (useCases.length > 0) {
+    const useCasesToQuery = useCases.slice(0, 3);
     for (const useCase of useCasesToQuery) {
       addQueries(QUERY_TEMPLATES.useCase, 'useCase', 1, { useCase });
     }
@@ -527,23 +544,34 @@ function generateEnhancedQueries(brand, analysis, options = {}) {
   // DON'T shuffle - keep high priority queries first
   const result = uniqueQueries.slice(0, maxTotalQueries);
   
-  console.log(`Generated ${result.length} unique queries for ${brand}`);
-  console.log(`Query breakdown: ${result.filter(q => q.queryType === 'directBrand').length} direct brand, ${result.filter(q => q.queryType === 'brandOpinion').length} brand opinion, ${result.filter(q => q.queryType === 'naturalDiscovery').length} natural discovery`);
+  console.log(`Generated ${result.length} unique queries for ${brand} (industry: ${industry})`);
+  console.log(`Using product types: ${industryData.productTypes.slice(0, 3).join(', ')}`);
+  console.log(`Using product actions: ${industryData.productActions.slice(0, 3).join(', ')}`);
+  console.log(`Query breakdown: ${result.filter(q => q.queryType === 'directBrand').length} direct brand, ${result.filter(q => q.queryType === 'productDiscovery').length} product discovery, ${result.filter(q => q.queryType === 'bestQueries').length} best queries`);
   return result;
 }
 
 /**
  * Generate basic queries for a brand (fallback when AI fails)
+ * Uses product-specific queries based on industry
  */
-function generateQueries(brand, industry = 'software', options = {}) {
+function generateQueries(brand, industry = 'general', options = {}) {
   const queries = [];
-  const useCases = INDUSTRY_USE_CASES[industry.toLowerCase()] || INDUSTRY_USE_CASES.default;
+  
+  // Get industry-specific product data
+  const industryData = INDUSTRY_DATA[industry.toLowerCase()] || INDUSTRY_DATA['general'];
+  const getRandomItem = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
   // PRIORITY 1: Direct brand queries (always include these)
   const directBrandTemplates = QUERY_TEMPLATES.directBrand || [];
   for (let i = 0; i < Math.min(5, directBrandTemplates.length); i++) {
+    const productType = getRandomItem(industryData.productTypes);
+    const productAction = getRandomItem(industryData.productActions);
     queries.push({
-      queryText: directBrandTemplates[i].replace(/{brand}/g, brand),
+      queryText: directBrandTemplates[i]
+        .replace(/{brand}/g, brand)
+        .replace(/{productType}/g, productType)
+        .replace(/{productAction}/g, productAction),
       queryType: 'directBrand'
     });
   }
@@ -551,102 +579,169 @@ function generateQueries(brand, industry = 'software', options = {}) {
   // PRIORITY 2: Brand opinion queries
   const brandOpinionTemplates = QUERY_TEMPLATES.brandOpinion || [];
   for (let i = 0; i < Math.min(4, brandOpinionTemplates.length); i++) {
+    const productAction = getRandomItem(industryData.productActions);
     queries.push({
-      queryText: brandOpinionTemplates[i].replace(/{brand}/g, brand),
+      queryText: brandOpinionTemplates[i]
+        .replace(/{brand}/g, brand)
+        .replace(/{productAction}/g, productAction),
       queryType: 'brandOpinion'
     });
   }
 
-  // PRIORITY 3: Natural discovery queries
-  const discoveryTemplates = QUERY_TEMPLATES.naturalDiscovery || [];
-  for (let i = 0; i < Math.min(4, discoveryTemplates.length); i++) {
+  // PRIORITY 3: Product discovery queries (the key improvement!)
+  const discoveryTemplates = QUERY_TEMPLATES.productDiscovery || [];
+  for (let i = 0; i < Math.min(5, discoveryTemplates.length); i++) {
+    const productType = getRandomItem(industryData.productTypes);
+    const productAction = getRandomItem(industryData.productActions);
     queries.push({
-      queryText: discoveryTemplates[i].replace(/{industry}/g, industry),
-      queryType: 'naturalDiscovery'
+      queryText: discoveryTemplates[i]
+        .replace(/{productType}/g, productType)
+        .replace(/{productAction}/g, productAction),
+      queryType: 'productDiscovery'
     });
   }
 
-  // PRIORITY 4: Best queries
+  // PRIORITY 4: Best queries (product-specific)
   const bestTemplates = QUERY_TEMPLATES.bestQueries || [];
-  for (let i = 0; i < Math.min(3, bestTemplates.length); i++) {
+  for (let i = 0; i < Math.min(4, bestTemplates.length); i++) {
+    const productType = getRandomItem(industryData.productTypes);
+    const productAction = getRandomItem(industryData.productActions);
     queries.push({
       queryText: bestTemplates[i]
-        .replace(/{industry}/g, industry)
-        .replace(/{targetAudience}/g, 'businesses'),
+        .replace(/{productType}/g, productType)
+        .replace(/{productAction}/g, productAction)
+        .replace(/{targetAudience}/g, 'everyone'),
       queryType: 'bestQueries'
     });
   }
 
   // PRIORITY 5: Alternatives and review queries
   const altTemplates = QUERY_TEMPLATES.alternatives || [];
-  for (let i = 0; i < Math.min(2, altTemplates.length); i++) {
+  for (let i = 0; i < Math.min(3, altTemplates.length); i++) {
+    const productType = getRandomItem(industryData.productTypes);
+    const productAction = getRandomItem(industryData.productActions);
     queries.push({
-      queryText: altTemplates[i].replace(/{brand}/g, brand),
+      queryText: altTemplates[i]
+        .replace(/{brand}/g, brand)
+        .replace(/{productType}/g, productType)
+        .replace(/{productAction}/g, productAction),
       queryType: 'alternatives'
     });
   }
 
   const reviewTemplates = QUERY_TEMPLATES.review || [];
   for (let i = 0; i < Math.min(2, reviewTemplates.length); i++) {
+    const productAction = getRandomItem(industryData.productActions);
     queries.push({
-      queryText: reviewTemplates[i].replace(/{brand}/g, brand),
+      queryText: reviewTemplates[i]
+        .replace(/{brand}/g, brand)
+        .replace(/{productAction}/g, productAction),
       queryType: 'review'
     });
   }
 
   // PRIORITY 6: Use case queries
+  const useCases = industryData.useCases || [];
   const useCaseTemplates = QUERY_TEMPLATES.useCase || [];
   for (let i = 0; i < Math.min(2, useCases.length); i++) {
     const template = useCaseTemplates[i % useCaseTemplates.length];
+    const productType = getRandomItem(industryData.productTypes);
     if (template) {
       queries.push({
-        queryText: template.replace(/{useCase}/g, useCases[i]),
+        queryText: template
+          .replace(/{useCase}/g, useCases[i])
+          .replace(/{productType}/g, productType),
         queryType: 'useCase'
       });
     }
   }
 
+  console.log(`[Fallback] Generated ${queries.length} queries for ${brand} (industry: ${industry})`);
   return queries;
 }
 
 /**
- * Infer industry from domain name or brand
+ * Infer SPECIFIC industry from brand name
+ * Maps brands to their actual product category, not generic "software" or "entertainment"
  */
 function inferIndustry(domain) {
   const domainLower = domain.toLowerCase();
   
-  const industryKeywords = {
-    // TECH INDUSTRIES
-    'crm': ['salesforce', 'hubspot', 'pipedrive', 'zoho', 'crm'],
-    'marketing': ['mailchimp', 'sendgrid', 'marketo', 'buffer', 'hootsuite'],
-    'ecommerce': ['shopify', 'woocommerce', 'bigcommerce', 'magento'],
-    'project management': ['asana', 'trello', 'monday', 'jira', 'notion', 'clickup'],
-    'analytics': ['mixpanel', 'amplitude', 'tableau', 'looker'],
-    'communication': ['slack', 'discord', 'teams', 'zoom', 'meet'],
-    'development': ['github', 'gitlab', 'bitbucket', 'vercel', 'netlify'],
-    'design': ['figma', 'sketch', 'adobe', 'canva', 'invision'],
-    'hr': ['workday', 'bamboohr', 'gusto', 'rippling', 'lever'],
-    'finance': ['quickbooks', 'xero', 'stripe', 'square', 'wave', 'paypal', 'venmo'],
-    'social media': ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'youtube', 'snapchat', 'reddit'],
-    // NON-TECH INDUSTRIES
-    'sportswear': ['nike', 'adidas', 'puma', 'under armour', 'reebok', 'new balance', 'asics', 'lululemon', 'fila', 'converse'],
-    'fashion': ['zara', 'h&m', 'gucci', 'louis vuitton', 'prada', 'chanel', 'uniqlo', 'gap', 'levis', 'ralph lauren', 'burberry'],
-    'food & beverage': ['mcdonald', 'starbucks', 'coca-cola', 'pepsi', 'burger king', 'subway', 'chipotle', 'domino', 'kfc', 'dunkin', 'wendy'],
-    'automotive': ['tesla', 'toyota', 'ford', 'bmw', 'mercedes', 'honda', 'chevrolet', 'audi', 'volkswagen', 'porsche', 'ferrari', 'hyundai'],
-    'retail': ['amazon', 'walmart', 'target', 'costco', 'ikea', 'home depot', 'best buy', 'ebay', 'alibaba', 'etsy'],
-    'entertainment': ['netflix', 'disney', 'spotify', 'hbo', 'hulu', 'paramount', 'warner', 'sony', 'universal'],
-    'travel': ['airbnb', 'booking', 'expedia', 'tripadvisor', 'marriott', 'hilton', 'united', 'delta', 'southwest', 'american airlines'],
-    'healthcare': ['cvs', 'walgreens', 'unitedhealth', 'pfizer', 'johnson', 'moderna', 'aetna', 'cigna'],
-    'banking': ['chase', 'bank of america', 'wells fargo', 'citi', 'capital one', 'goldman', 'morgan stanley', 'hsbc']
+  // Map brands to SPECIFIC industries that match INDUSTRY_DATA keys
+  const brandToIndustry = {
+    // MUSIC STREAMING
+    'music streaming': ['spotify', 'apple music', 'tidal', 'deezer', 'soundcloud', 'pandora', 'amazon music', 'youtube music'],
+    
+    // VIDEO STREAMING
+    'video streaming': ['netflix', 'hulu', 'disney', 'hbo', 'paramount', 'peacock', 'prime video', 'amazon prime', 'apple tv', 'crunchyroll'],
+    
+    // GAMING COMMUNICATION
+    'gaming communication': ['discord', 'teamspeak', 'mumble', 'curse'],
+    
+    // SOCIAL MEDIA
+    'social media': ['facebook', 'instagram', 'twitter', 'tiktok', 'snapchat', 'linkedin', 'reddit', 'pinterest', 'threads', 'mastodon'],
+    
+    // CRM
+    'crm': ['salesforce', 'hubspot', 'pipedrive', 'zoho crm', 'freshsales', 'monday sales'],
+    
+    // PROJECT MANAGEMENT
+    'project management': ['asana', 'trello', 'monday', 'jira', 'notion', 'clickup', 'basecamp', 'wrike', 'todoist'],
+    
+    // MARKETING
+    'marketing': ['mailchimp', 'sendgrid', 'marketo', 'buffer', 'hootsuite', 'constant contact', 'klaviyo', 'convertkit'],
+    
+    // ECOMMERCE
+    'ecommerce': ['shopify', 'woocommerce', 'bigcommerce', 'magento', 'squarespace commerce', 'wix stores'],
+    
+    // COMMUNICATION (Work/Team)
+    'communication': ['slack', 'teams', 'zoom', 'google meet', 'webex', 'microsoft teams'],
+    
+    // DEVELOPMENT
+    'development': ['github', 'gitlab', 'bitbucket', 'vercel', 'netlify', 'heroku', 'aws', 'azure'],
+    
+    // DESIGN
+    'design': ['figma', 'sketch', 'adobe', 'canva', 'invision', 'framer', 'miro'],
+    
+    // FINANCE
+    'finance': ['quickbooks', 'xero', 'stripe', 'square', 'paypal', 'venmo', 'freshbooks', 'wave'],
+    
+    // CUSTOMER SUPPORT
+    'customer support': ['zendesk', 'intercom', 'freshdesk', 'helpscout', 'drift', 'crisp'],
+    
+    // === NON-TECH ===
+    
+    // SPORTSWEAR
+    'sportswear': ['nike', 'adidas', 'puma', 'under armour', 'reebok', 'new balance', 'asics', 'lululemon', 'fila', 'converse', 'jordan', 'vans'],
+    
+    // FASHION
+    'fashion': ['zara', 'h&m', 'gucci', 'louis vuitton', 'prada', 'chanel', 'uniqlo', 'gap', 'levis', 'ralph lauren', 'burberry', 'versace', 'dior'],
+    
+    // FAST FOOD
+    'fast food': ['mcdonald', 'burger king', 'wendy', 'taco bell', 'kfc', 'chick-fil-a', 'subway', 'chipotle', 'five guys', 'popeyes', 'arbys', 'sonic'],
+    
+    // COFFEE
+    'coffee': ['starbucks', 'dunkin', 'peet', 'tim hortons', 'costa coffee', 'blue bottle', 'philz'],
+    
+    // AUTOMOTIVE
+    'automotive': ['tesla', 'toyota', 'ford', 'bmw', 'mercedes', 'honda', 'chevrolet', 'audi', 'volkswagen', 'porsche', 'ferrari', 'hyundai', 'nissan', 'mazda', 'kia', 'rivian', 'lucid'],
+    
+    // RETAIL
+    'retail': ['amazon', 'walmart', 'target', 'costco', 'ikea', 'home depot', 'best buy', 'ebay', 'alibaba', 'etsy', 'wayfair'],
+    
+    // TRAVEL
+    'travel': ['airbnb', 'booking', 'expedia', 'tripadvisor', 'marriott', 'hilton', 'vrbo', 'kayak', 'hotels.com'],
+    
+    // BANKING
+    'banking': ['chase', 'bank of america', 'wells fargo', 'citi', 'capital one', 'goldman', 'morgan stanley', 'hsbc', 'barclays', 'santander']
   };
 
-  for (const [industry, keywords] of Object.entries(industryKeywords)) {
-    if (keywords.some(kw => domainLower.includes(kw))) {
+  for (const [industry, brands] of Object.entries(brandToIndustry)) {
+    if (brands.some(brand => domainLower.includes(brand))) {
       return industry;
     }
   }
 
-  // Don't default to software - return null so AI can detect
+  // Return null so AI can detect the industry
   return null;
 }
 
@@ -683,6 +778,7 @@ module.exports = {
   inferIndustry,
   getQueryStats,
   QUERY_TEMPLATES,
+  INDUSTRY_DATA,
   INDUSTRY_USE_CASES,
   TARGET_AUDIENCES,
   COMMON_FEATURES,
