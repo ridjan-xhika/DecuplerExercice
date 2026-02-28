@@ -3,6 +3,7 @@ const cors = require('cors');
 require('dotenv').config();
 
 const { testConnection } = require('./config/db');
+const { checkOpenAIStatus } = require('./services/openaiClient');
 
 const app = express();
 
@@ -13,17 +14,21 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 const queryRoutes = require('./routes/queryRoutes');
+const aiRoutes = require('./routes/aiRoutes');
 app.use('/api/queries', queryRoutes);
+app.use('/api/ai', aiRoutes);
 // app.use('/api/domains', require('./routes/domainRoutes'));
 // app.use('/api/analysis', require('./routes/analysisRoutes'));
 
 // Health check
 app.get('/api/health', async (req, res) => {
   const dbConnected = await testConnection();
+  const openaiStatus = await checkOpenAIStatus();
   res.json({ 
     status: 'ok', 
     message: 'Server is running',
-    database: dbConnected ? 'connected' : 'disconnected'
+    database: dbConnected ? 'connected' : 'disconnected',
+    openai: openaiStatus.working ? 'connected' : 'disconnected'
   });
 });
 
