@@ -82,14 +82,16 @@ function RecommendationList({ recommendations, aiRecommendations }) {
           {aiRecommendations.map((aiRec, index) => (
             <div key={index} className="ai-recommendation-item">
               <div className="ai-provider-badge">
-                {aiRec.provider}
+                {aiRec.provider || aiRec.ai_provider || 'AI'}
               </div>
               <div className="ai-recommendation-content markdown-content">
-                <ReactMarkdown>{aiRec.content}</ReactMarkdown>
+                <ReactMarkdown>{aiRec.content || aiRec.description || ''}</ReactMarkdown>
               </div>
-              <div className="ai-generated-time">
-                Generated: {new Date(aiRec.generatedAt).toLocaleString()}
-              </div>
+              {(aiRec.generatedAt || aiRec.created_at) && (
+                <div className="ai-generated-time">
+                  Generated: {new Date(aiRec.generatedAt || aiRec.created_at).toLocaleString()}
+                </div>
+              )}
             </div>
           ))}
         </div>

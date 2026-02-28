@@ -19,6 +19,8 @@ function App() {
     
     try {
       const response = await analysisAPI.analyze(domain, industry);
+      console.log('Full report:', response.data);
+      console.log('AI Recommendations:', response.data.aiRecommendations);
       setReport(response.data);
     } catch (err) {
       setError(err.response?.data?.error || 'Analysis failed. Please try again.');
@@ -81,8 +83,13 @@ function App() {
             <div className="card full-width">
               <h2 className="card-title">Recommendations</h2>
               <RecommendationList 
-                recommendations={report.recommendations} 
-                aiRecommendations={report.aiRecommendations}
+                recommendations={
+                  report.recommendations?.filter(r => !r.is_ai_generated && r.recommendation_type !== 'ai_generated') || []
+                } 
+                aiRecommendations={
+                  report.aiRecommendations || 
+                  report.recommendations?.filter(r => r.is_ai_generated || r.recommendation_type === 'ai_generated') || []
+                }
               />
             </div>
           </div>
