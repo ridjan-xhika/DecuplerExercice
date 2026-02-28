@@ -60,13 +60,20 @@ async function runFullAnalysis(domainName, options = {}) {
 
     // Step 4: Get stored responses and analyze
     const responses = await getResponsesForDomain(domain.id);
-    const analysisResults = await analyzeAllResponses(responses, domainName);
+    const analysisResults = await analyzeAllResponses(responses, domainName) || {
+      totalResponses: 0,
+      responsesWithTarget: 0,
+      totalMentions: 0,
+      top1Count: 0,
+      top3Count: 0,
+      analyses: []
+    };
     report.analysis = {
-      totalResponses: analysisResults.totalResponses,
-      responsesWithTarget: analysisResults.responsesWithTarget,
-      totalMentions: analysisResults.totalMentions,
-      top1Count: analysisResults.top1Count,
-      top3Count: analysisResults.top3Count
+      totalResponses: analysisResults.totalResponses || 0,
+      responsesWithTarget: analysisResults.responsesWithTarget || 0,
+      totalMentions: analysisResults.totalMentions || 0,
+      top1Count: analysisResults.top1Count || 0,
+      top3Count: analysisResults.top3Count || 0
     };
 
     // Step 5: Calculate and save visibility score

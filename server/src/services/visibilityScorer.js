@@ -27,19 +27,46 @@ const SCORING_WEIGHTS = {
  * @returns {object} Computed score with breakdown
  */
 function calculateScore(analysisResults) {
+  // Handle null/undefined input
+  if (!analysisResults) {
+    return {
+      score: 0,
+      rawScore: 0,
+      maxPossibleScore: 0,
+      breakdown: { mentions: 0, top1: 0, top3: 0, competitorPenalty: 0 },
+      stats: {
+        totalQueries: 0,
+        totalMentions: 0,
+        top1Count: 0,
+        top3Count: 0,
+        avgPosition: null,
+        mentionRate: 0
+      }
+    };
+  }
+
   const {
-    totalResponses,
-    responsesWithTarget,
-    top1Count,
-    top3Count,
-    analyses
+    totalResponses = 0,
+    responsesWithTarget = 0,
+    top1Count = 0,
+    top3Count = 0,
+    analyses = []
   } = analysisResults;
 
   if (totalResponses === 0) {
     return {
       score: 0,
+      rawScore: 0,
+      maxPossibleScore: 0,
       breakdown: { mentions: 0, top1: 0, top3: 0, competitorPenalty: 0 },
-      normalized: 0
+      stats: {
+        totalQueries: 0,
+        totalMentions: 0,
+        top1Count: 0,
+        top3Count: 0,
+        avgPosition: null,
+        mentionRate: 0
+      }
     };
   }
 
@@ -123,14 +150,23 @@ function calculateScore(analysisResults) {
 async function calculateAndSaveScore(domainId, analysisResults) {
   const scoreData = calculateScore(analysisResults);
 
+  // Ensure stats exists
+  const stats = scoreData.stats || {
+    totalQueries: 0,
+    totalMentions: 0,
+    top1Count: 0,
+    top3Count: 0,
+    avgPosition: null
+  };
+
   // Save to database
   const storedScore = await VisibilityScore.create(domainId, {
     score: scoreData.score,
-    totalQueries: scoreData.stats.totalQueries,
-    totalMentions: scoreData.stats.totalMentions,
-    top1Count: scoreData.stats.top1Count,
-    top3Count: scoreData.stats.top3Count,
-    avgPosition: scoreData.stats.avgPosition
+    totalQueries: stats.totalQueries,
+    totalMentions: stats.totalMentions,
+    top1Count: stats.top1Count,
+    top3Count: stats.top3Count,
+    avgPosition: stats.avgPosition
   });
 
   return {

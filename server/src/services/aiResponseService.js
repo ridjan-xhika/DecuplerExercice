@@ -1,9 +1,9 @@
 /**
  * AI Response Service
- * Handles sending queries to OpenAI and storing responses
+ * Handles sending queries to Ollama and storing responses
  */
 
-const { askOpenAI, askOpenAIBatch } = require('./openaiClient');
+const { askOllama, askOllamaBatch } = require('./ollamaClient');
 const { AIResponse, Prompt } = require('../models');
 
 /**
@@ -13,10 +13,10 @@ const { AIResponse, Prompt } = require('../models');
  * @returns {object} Stored response record
  */
 async function queryAndStore(promptId, queryText) {
-  const result = await askOpenAI(queryText);
+  const result = await askOllama(queryText);
 
   if (!result.success) {
-    throw new Error(`OpenAI query failed: ${result.error}`);
+    throw new Error(`Ollama query failed: ${result.error}`);
   }
 
   // Store in database
@@ -40,7 +40,8 @@ async function queryAndStore(promptId, queryText) {
  * @returns {object} Summary of processed responses
  */
 async function processDomainsPrompts(domainId, options = {}) {
-  const { concurrency = 2 } = options;
+  // Reduced concurrency to 1 to avoid rate limits
+  const { concurrency = 1 } = options;
 
   // Get all prompts for this domain
   const prompts = await Prompt.findByDomainId(domainId);
@@ -74,9 +75,9 @@ async function processDomainsPrompts(domainId, options = {}) {
     const batchResults = await Promise.all(batchPromises);
     results.responses.push(...batchResults);
 
-    // Rate limiting delay between batches
+    // Increased delay between batches to respect rate limits (2 seconds)
     if (i + concurrency < prompts.length) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 2000));
     }
   }
 
