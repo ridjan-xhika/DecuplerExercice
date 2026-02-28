@@ -15,10 +15,10 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 const queryRoutes = require('./routes/queryRoutes');
 const aiRoutes = require('./routes/aiRoutes');
+const analysisRoutes = require('./routes/analysisRoutes');
 app.use('/api/queries', queryRoutes);
 app.use('/api/ai', aiRoutes);
-// app.use('/api/domains', require('./routes/domainRoutes'));
-// app.use('/api/analysis', require('./routes/analysisRoutes'));
+app.use('/api/analysis', analysisRoutes);
 
 // Health check
 app.get('/api/health', async (req, res) => {
