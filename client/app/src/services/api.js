@@ -11,9 +11,17 @@ const api = axios.create({
 
 // Analysis API
 export const analysisAPI = {
-  // Run full analysis
-  analyze: (domain, industry = null) => 
-    api.post('/analysis', { domain, industry }),
+  // Run full analysis with enhanced options
+  analyze: (domain, options = {}) => 
+    api.post('/analysis', { 
+      domain, 
+      industry: options.industry,
+      targetAudience: options.targetAudience,
+      mainUseCases: options.mainUseCases,
+      knownCompetitors: options.knownCompetitors,
+      productDescription: options.productDescription,
+      region: options.region
+    }),
 
   // Get all domains
   getDomains: () => 

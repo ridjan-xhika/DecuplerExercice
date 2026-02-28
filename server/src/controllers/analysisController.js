@@ -2,16 +2,36 @@ const { Domain } = require('../models');
 const { runFullAnalysis, getExistingReport } = require('../services/analysisPipeline');
 const { getScoreHistory } = require('../services/visibilityScorer');
 
-// Run full analysis for a domain
+// Run full analysis for a domain with enhanced options
 const analyze = async (req, res) => {
   try {
-    const { domain, industry, options } = req.body;
+    const { 
+      domain, 
+      industry, 
+      targetAudience,
+      mainUseCases,
+      knownCompetitors,
+      productDescription,
+      region,
+      options 
+    } = req.body;
 
     if (!domain) {
       return res.status(400).json({ error: 'Domain is required' });
     }
 
-    const result = await runFullAnalysis(domain, { industry, queryOptions: options });
+    // Build enhanced options for the pipeline
+    const pipelineOptions = {
+      industry,
+      targetAudience,
+      mainUseCases,
+      knownCompetitors,
+      productDescription,
+      region,
+      queryOptions: options
+    };
+
+    const result = await runFullAnalysis(domain, pipelineOptions);
 
     if (!result.success) {
       return res.status(500).json({ 

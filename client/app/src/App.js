@@ -13,12 +13,12 @@ function App() {
   const [error, setError] = useState(null);
   const [report, setReport] = useState(null);
 
-  const handleAnalyze = async (domain, industry) => {
+  const handleAnalyze = async (domain, options = {}) => {
     setLoading(true);
     setError(null);
     
     try {
-      const response = await analysisAPI.analyze(domain, industry);
+      const response = await analysisAPI.analyze(domain, options);
       console.log('Full report:', response.data);
       console.log('AI Recommendations:', response.data.aiRecommendations);
       setReport(response.data);
