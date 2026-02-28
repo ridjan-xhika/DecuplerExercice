@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
+const { testConnection } = require('./config/db');
+
 const app = express();
 
 // Middleware
@@ -10,11 +12,17 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
-// app.use('/api/users', require('./routes/userRoutes'));
+// app.use('/api/domains', require('./routes/domainRoutes'));
+// app.use('/api/analysis', require('./routes/analysisRoutes'));
 
 // Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Server is running' });
+app.get('/api/health', async (req, res) => {
+  const dbConnected = await testConnection();
+  res.json({ 
+    status: 'ok', 
+    message: 'Server is running',
+    database: dbConnected ? 'connected' : 'disconnected'
+  });
 });
 
 // Error handling middleware
