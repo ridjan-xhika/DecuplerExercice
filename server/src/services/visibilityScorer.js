@@ -142,6 +142,10 @@ function calculateScore(analysisResults) {
 
   // Extract ranking data if available
   const rankings = analysisResults.rankings || { found: false, positions: [], averageRank: null, bestRank: null };
+  
+  // Extract brand vs discovery query stats
+  const brandQueries = analysisResults.brandQueries || { total: 0, mentioned: 0, mentionRate: 0 };
+  const discoveryQueries = analysisResults.discoveryQueries || { total: 0, mentioned: 0, mentionRate: 0 };
 
   return {
     score: Math.round(finalScore * 100) / 100,
@@ -162,7 +166,20 @@ function calculateScore(analysisResults) {
       top3Count,
       avgPosition: avgPosition ? Math.round(avgPosition * 100) / 100 : null,
       mentionRate,
-      // NEW: Ranking data
+      // Brand vs Discovery query stats
+      brandQueries: {
+        total: brandQueries.total,
+        mentioned: brandQueries.mentioned,
+        mentionRate: brandQueries.mentionRate
+      },
+      discoveryQueries: {
+        total: discoveryQueries.total,
+        mentioned: discoveryQueries.mentioned,
+        mentionRate: discoveryQueries.mentionRate,
+        top1Count: discoveryQueries.top1Count || 0,
+        top3Count: discoveryQueries.top3Count || 0
+      },
+      // Ranking data
       ranking: rankings.found ? {
         averageRank: rankings.averageRank,
         bestRank: rankings.bestRank,

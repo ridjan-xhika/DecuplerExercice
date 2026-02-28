@@ -299,6 +299,23 @@ function detectBrandIndustry(brandName) {
 }
 
 /**
+ * Get all known competitors for a brand's industry
+ * @param {string} brandName - The target brand name
+ * @returns {string[]} List of competitors
+ */
+function getIndustryCompetitors(brandName) {
+  const industry = detectBrandIndustry(brandName);
+  if (!industry) {
+    return [];
+  }
+  
+  const competitors = INDUSTRY_COMPETITORS[industry] || [];
+  // Filter out the target brand itself
+  const normalized = brandName.toLowerCase().trim();
+  return competitors.filter(c => !c.toLowerCase().includes(normalized) && !normalized.includes(c.toLowerCase()));
+}
+
+/**
  * Get competitors for a specific brand based on its industry
  * @param {string} brandName - The target brand
  * @returns {Array} List of competitor names to look for
@@ -504,9 +521,14 @@ function extractRankingPosition(text, targetBrand) {
 
 /**
  * Analyze all AI responses for a domain
- * Now includes ranking extraction
+ * Now includes ranking extraction and separate stats for brand vs discovery queries
  */
 async function analyzeAllResponses(responses, targetBrand) {
+  // Brand query types - these mention the brand directly
+  const brandQueryTypes = ['directBrand', 'brandOpinion', 'comparison'];
+  // Discovery query types - these DON'T mention the brand
+  const discoveryQueryTypes = ['productDiscovery', 'bestQueries', 'ranking', 'useCase', 'audienceSpecific', 'pricing', 'regional'];
+
   const results = {
     totalResponses: responses.length,
     responsesWithTarget: 0,
@@ -515,7 +537,22 @@ async function analyzeAllResponses(responses, targetBrand) {
     top3Count: 0,
     competitorCounts: {},
     analyses: [],
-    // NEW: Ranking data
+    
+    // Separate stats for brand queries vs discovery queries
+    brandQueries: {
+      total: 0,
+      mentioned: 0,
+      mentionRate: 0
+    },
+    discoveryQueries: {
+      total: 0,
+      mentioned: 0,
+      mentionRate: 0,  // This is the TRUE organic visibility
+      top1Count: 0,
+      top3Count: 0
+    },
+    
+    // Ranking data
     rankings: {
       found: false,
       positions: [],
@@ -529,6 +566,25 @@ async function analyzeAllResponses(responses, targetBrand) {
     const analysis = await analyzeResponse(response.id, response.response_text, targetBrand);
     results.analyses.push(analysis);
 
+    const queryType = response.query_type || 'unknown';
+    const isBrandQuery = brandQueryTypes.includes(queryType);
+    const isDiscoveryQuery = discoveryQueryTypes.includes(queryType);
+
+    // Track brand vs discovery queries separately
+    if (isBrandQuery) {
+      results.brandQueries.total++;
+      if (analysis.targetBrand.mentioned) {
+        results.brandQueries.mentioned++;
+      }
+    } else if (isDiscoveryQuery) {
+      results.discoveryQueries.total++;
+      if (analysis.targetBrand.mentioned) {
+        results.discoveryQueries.mentioned++;
+        if (analysis.targetBrand.position === 1) results.discoveryQueries.top1Count++;
+        if (analysis.targetBrand.position <= 3) results.discoveryQueries.top3Count++;
+      }
+    }
+
     if (analysis.targetBrand.mentioned) {
       results.responsesWithTarget++;
       results.totalMentions++;
@@ -537,14 +593,25 @@ async function analyzeAllResponses(responses, targetBrand) {
       if (analysis.targetBrand.position <= 3) results.top3Count++;
     }
 
-    // Track competitor frequencies
+    // Track competitor frequencies from ALL responses
     for (const comp of analysis.competitors) {
       results.competitorCounts[comp.competitor_name] = 
         (results.competitorCounts[comp.competitor_name] || 0) + 1;
     }
 
+    // Also scan response text for known competitors if none were found
+    if (analysis.competitors.length === 0) {
+      const industryCompetitors = getIndustryCompetitors(targetBrand);
+      const responseLower = response.response_text.toLowerCase();
+      for (const comp of industryCompetitors) {
+        if (responseLower.includes(comp.toLowerCase())) {
+          results.competitorCounts[comp] = (results.competitorCounts[comp] || 0) + 1;
+        }
+      }
+    }
+
     // Extract ranking if this is a ranking query
-    if (response.query_type === 'ranking') {
+    if (queryType === 'ranking') {
       const rankingResult = extractRankingPosition(response.response_text, targetBrand);
       if (rankingResult.found && rankingResult.position !== null) {
         results.rankings.found = true;
@@ -555,6 +622,14 @@ async function analyzeAllResponses(responses, targetBrand) {
         });
       }
     }
+  }
+
+  // Calculate mention rates
+  if (results.brandQueries.total > 0) {
+    results.brandQueries.mentionRate = Math.round((results.brandQueries.mentioned / results.brandQueries.total) * 100);
+  }
+  if (results.discoveryQueries.total > 0) {
+    results.discoveryQueries.mentionRate = Math.round((results.discoveryQueries.mentioned / results.discoveryQueries.total) * 100);
   }
 
   // Calculate ranking stats
