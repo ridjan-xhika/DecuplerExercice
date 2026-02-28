@@ -126,6 +126,81 @@ const INDUSTRY_COMPETITORS = {
     'netflix', 'disney+', 'hulu', 'amazon prime video', 'hbo max', 
     'apple tv+', 'paramount+', 'peacock', 'spotify', 'apple music',
     'youtube music', 'tidal', 'deezer', 'twitch'
+  ],
+
+  // ============ NON-TECH INDUSTRIES ============
+  
+  // Music Streaming
+  'music streaming': [
+    'spotify', 'apple music', 'amazon music', 'youtube music', 'tidal',
+    'deezer', 'pandora', 'soundcloud', 'audiomack', 'qobuz'
+  ],
+  
+  // Video Streaming
+  'video streaming': [
+    'netflix', 'disney+', 'hulu', 'hbo max', 'amazon prime video',
+    'apple tv+', 'paramount+', 'peacock', 'crunchyroll', 'youtube'
+  ],
+  
+  // Gaming Communication
+  'gaming communication': [
+    'discord', 'teamspeak', 'mumble', 'guilded', 'steam chat'
+  ],
+  
+  // Sportswear & Athletic
+  'sportswear': [
+    'nike', 'adidas', 'puma', 'under armour', 'reebok', 'new balance',
+    'asics', 'lululemon', 'fila', 'converse', 'vans', 'skechers',
+    'brooks', 'saucony', 'hoka', 'on running', 'allbirds'
+  ],
+  
+  // Fashion & Apparel
+  'fashion': [
+    'zara', 'h&m', 'uniqlo', 'gap', 'forever 21', 'shein', 'asos',
+    'gucci', 'louis vuitton', 'prada', 'chanel', 'dior', 'versace',
+    'ralph lauren', 'tommy hilfiger', 'calvin klein', 'levis', 'nike'
+  ],
+  
+  // Fast Food
+  'fast food': [
+    'mcdonald\'s', 'mcdonalds', 'burger king', 'wendy\'s', 'wendys', 
+    'taco bell', 'kfc', 'chick-fil-a', 'subway', 'chipotle', 
+    'five guys', 'popeyes', 'arby\'s', 'sonic', 'jack in the box',
+    'in-n-out', 'shake shack', 'whataburger', 'carl\'s jr', 'hardees'
+  ],
+  
+  // Coffee
+  'coffee': [
+    'starbucks', 'dunkin', 'peet\'s', 'tim hortons', 'costa coffee',
+    'blue bottle', 'philz', 'caribou coffee', 'dutch bros', 'la colombe'
+  ],
+  
+  // Automotive
+  'automotive': [
+    'toyota', 'honda', 'ford', 'chevrolet', 'bmw', 'mercedes', 'audi',
+    'volkswagen', 'nissan', 'hyundai', 'kia', 'tesla', 'rivian', 'lucid',
+    'porsche', 'ferrari', 'lamborghini', 'mazda', 'subaru', 'lexus'
+  ],
+  
+  // Retail
+  'retail': [
+    'amazon', 'walmart', 'target', 'costco', 'best buy', 'home depot',
+    'lowes', 'ikea', 'wayfair', 'bed bath & beyond', 'kohls', 'macys',
+    'nordstrom', 'tjmaxx', 'ross', 'dollar general', 'walgreens', 'cvs'
+  ],
+  
+  // Travel & Hospitality
+  'travel': [
+    'airbnb', 'booking.com', 'expedia', 'vrbo', 'hotels.com', 'kayak',
+    'tripadvisor', 'marriott', 'hilton', 'hyatt', 'ihg', 'wyndham',
+    'southwest', 'delta', 'united', 'american airlines', 'jetblue'
+  ],
+  
+  // Banking & Finance
+  'banking': [
+    'chase', 'bank of america', 'wells fargo', 'citi', 'capital one',
+    'us bank', 'pnc', 'td bank', 'ally', 'discover', 'american express',
+    'goldman sachs', 'morgan stanley', 'fidelity', 'charles schwab', 'vanguard'
   ]
 };
 
