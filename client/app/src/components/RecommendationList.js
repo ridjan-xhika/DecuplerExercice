@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 
 function RecommendationList({ recommendations, aiRecommendations }) {
   const [expandedSteps, setExpandedSteps] = useState({});
@@ -83,10 +84,8 @@ function RecommendationList({ recommendations, aiRecommendations }) {
               <div className="ai-provider-badge">
                 {aiRec.provider}
               </div>
-              <div className="ai-recommendation-content">
-                {aiRec.content.split('\n').map((line, lineIdx) => (
-                  <p key={lineIdx}>{line}</p>
-                ))}
+              <div className="ai-recommendation-content markdown-content">
+                <ReactMarkdown>{aiRec.content}</ReactMarkdown>
               </div>
               <div className="ai-generated-time">
                 Generated: {new Date(aiRec.generatedAt).toLocaleString()}
