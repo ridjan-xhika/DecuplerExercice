@@ -464,53 +464,44 @@ function generateEnhancedQueries(brand, analysis, options = {}) {
     }
   };
 
-  // ============ BRAND QUERIES (mention the brand) ============
-  // These test: Does the AI know about this brand?
+  // ============ BRAND QUERIES (mention the brand) - MINIMAL ============
+  // Only 5-6 queries with brand name - just to verify AI knows the brand exists
+  // These are NOT the main visibility test!
   
-  // 1. DIRECT BRAND QUERIES - "What is {brand}?" (4 queries)
-  addQueries(QUERY_TEMPLATES.directBrand, 'directBrand', 4);
+  // 1. DIRECT BRAND QUERIES - Just 2 to verify AI knows the brand
+  addQueries(QUERY_TEMPLATES.directBrand, 'directBrand', 2);
   
-  // 2. BRAND OPINION QUERIES - "How do you rate {brand}?" (3 queries)
-  addQueries(QUERY_TEMPLATES.brandOpinion, 'brandOpinion', 3);
-
-  // 3. COMPETITOR DISCOVERY - Ask AI directly for competitors (2 queries)
-  // This replaces hardcoded competitor lists!
+  // 2. COMPETITOR DISCOVERY - Ask AI who competitors are (2 queries)
   addQueries(QUERY_TEMPLATES.competitorDiscovery, 'competitorDiscovery', 2);
 
-  // 4. COMPETITOR COMPARISONS - "{brand} vs {competitor}?" (up to 4 queries)
-  if (topCompetitors.length > 0) {
-    const competitorsToCompare = topCompetitors.slice(0, 2);
-    for (const competitor of competitorsToCompare) {
-      addQueries(QUERY_TEMPLATES.comparison, 'comparison', 2, { competitor });
-    }
-  }
+  // Skip brand opinion and comparison queries - they inflate mention rate artificially
 
-  // ============ DISCOVERY QUERIES (NO brand mentioned) ============
-  // These test: Does the AI naturally recommend this brand?
-  // This is the TRUE test of AI visibility
+  // ============ DISCOVERY QUERIES (NO brand mentioned) - THE REAL TEST ============
+  // 85%+ of queries should be discovery - this is TRUE AI visibility
+  // If AI recommends your brand without being asked, THAT'S real visibility
 
-  // 4. RANKING QUERIES (CRITICAL) - "Rank the top 10 companies" (4 queries)
-  addQueries(QUERY_TEMPLATES.ranking, 'ranking', 4);
+  // 3. RANKING QUERIES (CRITICAL) - "Rank the top 10 companies" (6 queries)
+  addQueries(QUERY_TEMPLATES.ranking, 'ranking', 6);
 
-  // 5. PRODUCT DISCOVERY - "Where can I stream music?" (6 queries)
-  addQueries(QUERY_TEMPLATES.productDiscovery, 'productDiscovery', 6);
+  // 4. PRODUCT DISCOVERY - "Where can I buy running shoes?" (8 queries)
+  addQueries(QUERY_TEMPLATES.productDiscovery, 'productDiscovery', 8);
 
-  // 6. BEST QUERIES - "What's the best music streaming app?" (6 queries)
-  addQueries(QUERY_TEMPLATES.bestQueries, 'bestQueries', 6);
+  // 5. BEST QUERIES - "What's the best running shoe brand?" (8 queries)
+  addQueries(QUERY_TEMPLATES.bestQueries, 'bestQueries', 8);
 
-  // 7. USE CASE QUERIES (up to 4 queries)
+  // 6. USE CASE QUERIES (up to 6 queries)
   if (useCases.length > 0) {
-    const useCasesToQuery = useCases.slice(0, 4);
+    const useCasesToQuery = useCases.slice(0, 6);
     for (const useCase of useCasesToQuery) {
       addQueries(QUERY_TEMPLATES.useCase, 'useCase', 1, { useCase });
     }
   }
 
-  // 8. AUDIENCE-SPECIFIC QUERIES (3 queries)
-  addQueries(QUERY_TEMPLATES.audienceSpecific, 'audienceSpecific', 3);
+  // 7. AUDIENCE-SPECIFIC QUERIES (5 queries)
+  addQueries(QUERY_TEMPLATES.audienceSpecific, 'audienceSpecific', 5);
 
-  // 9. PRICING QUERIES - free/affordable options (2 queries)
-  addQueries(QUERY_TEMPLATES.pricing, 'pricing', 2);
+  // 8. PRICING QUERIES - free/affordable options (3 queries)
+  addQueries(QUERY_TEMPLATES.pricing, 'pricing', 3);
 
   // 10. REGIONAL QUERIES (if region provided)
   if (region && region !== 'global') {
@@ -541,7 +532,8 @@ function generateEnhancedQueries(brand, analysis, options = {}) {
 
 /**
  * Generate basic queries for a brand (fallback when AI fails)
- * Uses product-specific queries based on industry
+ * HEAVILY weighted toward DISCOVERY queries (no brand mentioned)
+ * Only ~10% of queries should mention the brand
  */
 function generateQueries(brand, industry = 'general', options = {}) {
   const queries = [];
@@ -550,46 +542,34 @@ function generateQueries(brand, industry = 'general', options = {}) {
   const industryData = INDUSTRY_DATA[industry.toLowerCase()] || INDUSTRY_DATA['general'];
   const getRandomItem = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-  // PRIORITY 1: Direct brand queries (always include these)
+  // ============ BRAND QUERIES - MINIMAL (just 2-3) ============
+  // Only to verify AI knows the brand exists
+  
+  // Just 2 direct brand queries
   const directBrandTemplates = QUERY_TEMPLATES.directBrand || [];
-  for (let i = 0; i < Math.min(5, directBrandTemplates.length); i++) {
-    const productType = getRandomItem(industryData.productTypes);
-    const productAction = getRandomItem(industryData.productActions);
+  for (let i = 0; i < Math.min(2, directBrandTemplates.length); i++) {
     queries.push({
-      queryText: directBrandTemplates[i]
-        .replace(/{brand}/g, brand)
-        .replace(/{productType}/g, productType)
-        .replace(/{productAction}/g, productAction),
+      queryText: directBrandTemplates[i].replace(/{brand}/g, brand),
       queryType: 'directBrand'
     });
   }
 
-  // PRIORITY 2: Brand opinion queries
-  const brandOpinionTemplates = QUERY_TEMPLATES.brandOpinion || [];
-  for (let i = 0; i < Math.min(4, brandOpinionTemplates.length); i++) {
-    const productAction = getRandomItem(industryData.productActions);
-    queries.push({
-      queryText: brandOpinionTemplates[i]
-        .replace(/{brand}/g, brand)
-        .replace(/{productAction}/g, productAction),
-      queryType: 'brandOpinion'
-    });
-  }
-
-  // PRIORITY 2.5: COMPETITOR DISCOVERY - Ask AI directly who competitors are
+  // 1 competitor discovery query
   const competitorDiscoveryTemplates = QUERY_TEMPLATES.competitorDiscovery || [];
-  for (let i = 0; i < Math.min(2, competitorDiscoveryTemplates.length); i++) {
+  if (competitorDiscoveryTemplates.length > 0) {
     queries.push({
-      queryText: competitorDiscoveryTemplates[i]
+      queryText: competitorDiscoveryTemplates[0]
         .replace(/{brand}/g, brand)
         .replace(/{industry}/g, industry),
       queryType: 'competitorDiscovery'
     });
   }
 
-  // PRIORITY 3: RANKING QUERIES (CRITICAL - tests organic visibility)
+  // ============ DISCOVERY QUERIES - THE REAL TEST (90%+) ============
+  
+  // RANKING QUERIES (6 queries)
   const rankingTemplates = QUERY_TEMPLATES.ranking || [];
-  for (let i = 0; i < Math.min(3, rankingTemplates.length); i++) {
+  for (let i = 0; i < Math.min(6, rankingTemplates.length); i++) {
     const productType = getRandomItem(industryData.productTypes);
     const productAction = getRandomItem(industryData.productActions);
     queries.push({
@@ -600,9 +580,9 @@ function generateQueries(brand, industry = 'general', options = {}) {
     });
   }
 
-  // PRIORITY 4: Product discovery queries (NO brand - tests organic visibility)
+  // PRODUCT DISCOVERY queries (8 queries - NO brand)
   const discoveryTemplates = QUERY_TEMPLATES.productDiscovery || [];
-  for (let i = 0; i < Math.min(5, discoveryTemplates.length); i++) {
+  for (let i = 0; i < Math.min(8, discoveryTemplates.length); i++) {
     const productType = getRandomItem(industryData.productTypes);
     const productAction = getRandomItem(industryData.productActions);
     queries.push({
@@ -613,9 +593,9 @@ function generateQueries(brand, industry = 'general', options = {}) {
     });
   }
 
-  // PRIORITY 5: Best queries (product-specific, NO brand)
+  // BEST QUERIES (8 queries - NO brand)
   const bestTemplates = QUERY_TEMPLATES.bestQueries || [];
-  for (let i = 0; i < Math.min(4, bestTemplates.length); i++) {
+  for (let i = 0; i < Math.min(8, bestTemplates.length); i++) {
     const productType = getRandomItem(industryData.productTypes);
     const productAction = getRandomItem(industryData.productActions);
     queries.push({

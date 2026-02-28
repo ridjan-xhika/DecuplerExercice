@@ -322,6 +322,41 @@ body {
   font-weight: 700;
 }
 
+/* PRIMARY METRIC - Make it stand out */
+.stat-item.primary-metric {
+  grid-column: span 2;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.stat-item.primary-metric .stat-value {
+  font-size: 3rem;
+  font-weight: 800;
+}
+
+.stat-item.primary-metric .stat-label {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Secondary metrics - less prominent */
+.stat-item.secondary-metric {
+  opacity: 0.8;
+}
+
+.stat-item.secondary-metric .stat-value {
+  font-size: 1.25rem;
+}
+
+/* Sublabel for additional context */
+.stat-sublabel {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+  opacity: 0.8;
+}
+
 .stat-item.highlight-stat {
   animation: pulse-glow 2s ease-in-out infinite;
 }
