@@ -1,22 +1,31 @@
 /**
  * Visibility Scoring Service
  * Computes visibility scores based on brand mentions in AI responses
+ * 
+ * NEW SCORING MODEL (less harsh):
+ * Base score: 50 (neutral starting point)
+ * - Brand mentioned → +10
+ * - Top 1 mention → +15 bonus
+ * - Top 3 mention → +8 bonus
+ * - Each competitor before brand → −3 (capped at -15)
+ * - Not mentioned at all → -5
+ * 
+ * This gives brands like Facebook a fair score since they're often mentioned
  */
 
 const { VisibilityScore, BrandMention } = require('../models');
 
 /**
- * Scoring weights (based on ScopeAndTasks.md)
- * - Brand mentioned → +3
- * - Top 1 mention → +5
- * - Top 3 mention → +3
- * - Each competitor before brand → −2
+ * Scoring weights (rebalanced for fairness)
  */
 const SCORING_WEIGHTS = {
-  MENTIONED: 3,
-  TOP_1: 5,
-  TOP_3: 3,
-  COMPETITOR_BEFORE: -2,
+  BASE_SCORE: 50,           // Start at neutral
+  MENTIONED: 10,            // Good: you were mentioned
+  TOP_1: 15,                // Excellent: mentioned first
+  TOP_3: 8,                 // Good: mentioned early
+  COMPETITOR_BEFORE: -3,    // Slight penalty per competitor
+  MAX_COMPETITOR_PENALTY: -15, // Cap the penalty
+  NOT_MENTIONED: -5,        // Penalty for not being mentioned
   MAX_SCORE: 100,
   MIN_SCORE: 0
 };
@@ -32,8 +41,8 @@ function calculateScore(analysisResults) {
     return {
       score: 0,
       rawScore: 0,
-      maxPossibleScore: 0,
-      breakdown: { mentions: 0, top1: 0, top3: 0, competitorPenalty: 0 },
+      maxPossibleScore: 100,
+      breakdown: { base: 0, mentions: 0, top1: 0, top3: 0, competitorPenalty: 0, notMentionedPenalty: 0 },
       stats: {
         totalQueries: 0,
         totalMentions: 0,
@@ -57,8 +66,8 @@ function calculateScore(analysisResults) {
     return {
       score: 0,
       rawScore: 0,
-      maxPossibleScore: 0,
-      breakdown: { mentions: 0, top1: 0, top3: 0, competitorPenalty: 0 },
+      maxPossibleScore: 100,
+      breakdown: { base: 0, mentions: 0, top1: 0, top3: 0, competitorPenalty: 0, notMentionedPenalty: 0 },
       stats: {
         totalQueries: 0,
         totalMentions: 0,
@@ -70,45 +79,53 @@ function calculateScore(analysisResults) {
     };
   }
 
-  // Calculate raw points
-  let rawScore = 0;
+  // Start with base score
+  let rawScore = SCORING_WEIGHTS.BASE_SCORE;
   let mentionPoints = 0;
   let top1Points = 0;
   let top3Points = 0;
   let competitorPenalty = 0;
+  let notMentionedPenalty = 0;
 
   for (const analysis of analyses) {
     if (analysis.targetBrand.mentioned) {
       // Points for being mentioned
-      mentionPoints += SCORING_WEIGHTS.MENTIONED;
-      rawScore += SCORING_WEIGHTS.MENTIONED;
+      const mentionBonus = SCORING_WEIGHTS.MENTIONED / totalResponses;
+      mentionPoints += mentionBonus;
+      rawScore += mentionBonus;
 
       // Bonus for top 1
       if (analysis.targetBrand.position === 1) {
-        top1Points += SCORING_WEIGHTS.TOP_1;
-        rawScore += SCORING_WEIGHTS.TOP_1;
+        const top1Bonus = SCORING_WEIGHTS.TOP_1 / totalResponses;
+        top1Points += top1Bonus;
+        rawScore += top1Bonus;
       }
       // Bonus for top 3 (but not top 1, to avoid double counting)
       else if (analysis.targetBrand.position <= 3) {
-        top3Points += SCORING_WEIGHTS.TOP_3;
-        rawScore += SCORING_WEIGHTS.TOP_3;
+        const top3Bonus = SCORING_WEIGHTS.TOP_3 / totalResponses;
+        top3Points += top3Bonus;
+        rawScore += top3Bonus;
       }
 
-      // Penalty for competitors mentioned before target
-      const penalty = analysis.competitorsBeforeTarget * SCORING_WEIGHTS.COMPETITOR_BEFORE;
-      competitorPenalty += penalty;
-      rawScore += penalty;
+      // Penalty for competitors mentioned before target (capped)
+      if (analysis.competitorsBeforeTarget > 0) {
+        const penalty = Math.max(
+          SCORING_WEIGHTS.MAX_COMPETITOR_PENALTY / totalResponses,
+          (analysis.competitorsBeforeTarget * SCORING_WEIGHTS.COMPETITOR_BEFORE) / totalResponses
+        );
+        competitorPenalty += penalty;
+        rawScore += penalty;
+      }
+    } else {
+      // Penalty for not being mentioned at all
+      const nmPenalty = SCORING_WEIGHTS.NOT_MENTIONED / totalResponses;
+      notMentionedPenalty += nmPenalty;
+      rawScore += nmPenalty;
     }
   }
 
-  // Calculate maximum possible score
-  // Best case: mentioned in all responses, always #1, no competitors before
-  const maxPossibleScore = totalResponses * (SCORING_WEIGHTS.MENTIONED + SCORING_WEIGHTS.TOP_1);
-
-  // Normalize to 0-100
-  const normalizedScore = maxPossibleScore > 0 
-    ? Math.max(0, Math.min(100, (rawScore / maxPossibleScore) * 100))
-    : 0;
+  // Clamp to 0-100
+  const finalScore = Math.max(SCORING_WEIGHTS.MIN_SCORE, Math.min(SCORING_WEIGHTS.MAX_SCORE, rawScore));
 
   // Calculate average position (only for responses where mentioned)
   let avgPosition = null;
@@ -120,24 +137,29 @@ function calculateScore(analysisResults) {
     avgPosition = mentionedPositions.reduce((a, b) => a + b, 0) / mentionedPositions.length;
   }
 
+  // Calculate mention rate
+  const mentionRate = totalResponses > 0 ? Math.round((responsesWithTarget / totalResponses) * 100) : 0;
+
   return {
-    score: Math.round(normalizedScore * 100) / 100,
-    rawScore,
-    maxPossibleScore,
+    score: Math.round(finalScore * 100) / 100,
+    rawScore: Math.round(rawScore * 100) / 100,
+    maxPossibleScore: 100,
     breakdown: {
-      mentions: mentionPoints,
-      top1: top1Points,
-      top3: top3Points,
-      competitorPenalty
+      base: SCORING_WEIGHTS.BASE_SCORE,
+      mentions: Math.round(mentionPoints * 100) / 100,
+      top1: Math.round(top1Points * 100) / 100,
+      top3: Math.round(top3Points * 100) / 100,
+      competitorPenalty: Math.round(competitorPenalty * 100) / 100,
+      notMentionedPenalty: Math.round(notMentionedPenalty * 100) / 100
     },
     stats: {
-      totalQueries: totalResponses, // Only successful responses counted
+      totalQueries: totalResponses,
       totalMentions: responsesWithTarget,
       top1Count,
       top3Count,
       avgPosition: avgPosition ? Math.round(avgPosition * 100) / 100 : null,
-      mentionRate: Math.round((responsesWithTarget / totalResponses) * 100),
-      note: 'Only successful AI responses are counted - failed queries are excluded'
+      mentionRate,
+      note: 'Score based on mention frequency, position, and competitor comparison'
     }
   };
 }

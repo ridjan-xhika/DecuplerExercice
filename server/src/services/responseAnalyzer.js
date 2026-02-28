@@ -1,30 +1,211 @@
 /**
  * Response Analyzer Service
  * Detects brand mentions, positions, and competitors in AI responses
+ * Now uses industry-aware competitor detection
  */
 
 const { BrandMention, Competitor } = require('../models');
 
-// Common software/tech brands to detect as potential competitors
-const KNOWN_BRANDS = [
-  'salesforce', 'hubspot', 'zoho', 'pipedrive', 'monday', 'asana', 'trello',
-  'jira', 'notion', 'clickup', 'slack', 'microsoft teams', 'zoom', 'google meet',
-  'shopify', 'woocommerce', 'bigcommerce', 'magento', 'squarespace', 'wix',
-  'mailchimp', 'sendgrid', 'klaviyo', 'constant contact', 'activecampaign',
-  'stripe', 'paypal', 'square', 'quickbooks', 'xero', 'freshbooks',
-  'zendesk', 'freshdesk', 'intercom', 'drift', 'crisp',
-  'ahrefs', 'semrush', 'moz', 'screaming frog', 'surfer seo',
-  'figma', 'sketch', 'adobe xd', 'canva', 'invision',
-  'github', 'gitlab', 'bitbucket', 'aws', 'azure', 'google cloud',
-  'vercel', 'netlify', 'heroku', 'digitalocean', 'cloudflare',
-  'datadog', 'new relic', 'splunk', 'grafana', 'prometheus',
-  'tableau', 'power bi', 'looker', 'metabase', 'amplitude', 'mixpanel',
-  'twilio', 'messagebird', 'vonage', 'plivo',
-  'segment', 'heap', 'hotjar', 'fullstory', 'crazy egg'
-];
+// Industry-specific competitor mappings
+// Only brands in the SAME industry should be considered competitors
+const INDUSTRY_COMPETITORS = {
+  // Social Media & Networking
+  'social media': [
+    'facebook', 'instagram', 'twitter', 'x', 'tiktok', 'snapchat', 'linkedin', 
+    'pinterest', 'reddit', 'youtube', 'whatsapp', 'telegram', 'discord', 
+    'threads', 'mastodon', 'bluesky', 'wechat', 'line', 'viber'
+  ],
+  
+  // CRM
+  'crm': [
+    'salesforce', 'hubspot', 'zoho crm', 'pipedrive', 'freshsales', 
+    'microsoft dynamics', 'monday crm', 'close', 'copper', 'insightly',
+    'sugar crm', 'nimble', 'agile crm', 'capsule', 'streak'
+  ],
+  
+  // Project Management
+  'project management': [
+    'asana', 'trello', 'monday', 'jira', 'notion', 'clickup', 'basecamp',
+    'wrike', 'smartsheet', 'teamwork', 'airtable', 'linear', 'height',
+    'todoist', 'things', 'omnifocus'
+  ],
+  
+  // Communication & Collaboration
+  'communication': [
+    'slack', 'microsoft teams', 'zoom', 'google meet', 'discord', 
+    'webex', 'gotomeeting', 'ringcentral', 'whereby', 'gather'
+  ],
+  
+  // E-commerce Platforms
+  'ecommerce': [
+    'shopify', 'woocommerce', 'bigcommerce', 'magento', 'squarespace', 
+    'wix', 'weebly', 'prestashop', 'opencart', 'volusion', 'ecwid',
+    'amazon', 'ebay', 'etsy', 'alibaba'
+  ],
+  
+  // Email Marketing
+  'email marketing': [
+    'mailchimp', 'sendgrid', 'klaviyo', 'constant contact', 'activecampaign',
+    'convertkit', 'drip', 'sendinblue', 'campaign monitor', 'aweber',
+    'getresponse', 'mailerlite', 'beehiiv', 'substack'
+  ],
+  
+  // Cloud & Infrastructure
+  'cloud': [
+    'aws', 'amazon web services', 'azure', 'google cloud', 'gcp',
+    'digitalocean', 'linode', 'vultr', 'heroku', 'vercel', 'netlify',
+    'cloudflare', 'fastly', 'akamai', 'oracle cloud', 'ibm cloud'
+  ],
+  
+  // Design Tools
+  'design': [
+    'figma', 'sketch', 'adobe xd', 'canva', 'invision', 'framer',
+    'webflow', 'zeplin', 'marvel', 'principle', 'adobe illustrator',
+    'adobe photoshop', 'affinity designer', 'procreate'
+  ],
+  
+  // Analytics & BI
+  'analytics': [
+    'google analytics', 'mixpanel', 'amplitude', 'heap', 'segment',
+    'tableau', 'power bi', 'looker', 'metabase', 'mode', 'sisense',
+    'hotjar', 'fullstory', 'crazy egg', 'posthog', 'plausible'
+  ],
+  
+  // SEO Tools
+  'seo': [
+    'ahrefs', 'semrush', 'moz', 'screaming frog', 'surfer seo',
+    'ubersuggest', 'serpstat', 'majestic', 'spyfu', 'brightedge'
+  ],
+  
+  // Development & DevOps
+  'development': [
+    'github', 'gitlab', 'bitbucket', 'jenkins', 'circleci', 'travis ci',
+    'docker', 'kubernetes', 'terraform', 'ansible', 'datadog',
+    'new relic', 'splunk', 'grafana', 'prometheus', 'sentry'
+  ],
+  
+  // Payments & Finance
+  'payments': [
+    'stripe', 'paypal', 'square', 'adyen', 'braintree', 'worldpay',
+    'authorize.net', 'wise', 'revolut', 'venmo', 'cashapp'
+  ],
+  
+  // Accounting
+  'accounting': [
+    'quickbooks', 'xero', 'freshbooks', 'wave', 'sage', 'netsuite',
+    'zoho books', 'kashoo', 'freeagent'
+  ],
+  
+  // HR & Recruiting
+  'hr': [
+    'workday', 'bamboohr', 'gusto', 'rippling', 'lever', 'greenhouse',
+    'adp', 'paychex', 'zenefits', 'hibob', 'lattice', 'deel'
+  ],
+  
+  // Customer Support
+  'customer support': [
+    'zendesk', 'freshdesk', 'intercom', 'drift', 'crisp', 'helpscout',
+    'front', 'kustomer', 'gorgias', 'tidio', 'livechat', 'tawk.to'
+  ],
+  
+  // Search Engines
+  'search': [
+    'google', 'bing', 'duckduckgo', 'yahoo', 'baidu', 'yandex',
+    'ecosia', 'brave search', 'you.com', 'perplexity'
+  ],
+  
+  // AI & LLMs
+  'ai': [
+    'openai', 'chatgpt', 'claude', 'anthropic', 'google bard', 'gemini',
+    'meta ai', 'llama', 'mistral', 'cohere', 'hugging face', 'midjourney',
+    'dall-e', 'stable diffusion', 'jasper ai', 'copy.ai'
+  ],
+  
+  // Streaming & Entertainment
+  'streaming': [
+    'netflix', 'disney+', 'hulu', 'amazon prime video', 'hbo max', 
+    'apple tv+', 'paramount+', 'peacock', 'spotify', 'apple music',
+    'youtube music', 'tidal', 'deezer', 'twitch'
+  ]
+};
+
+// Map common brand names to their industries
+const BRAND_TO_INDUSTRY = {
+  // Social Media
+  'facebook': 'social media', 'meta': 'social media', 'instagram': 'social media',
+  'twitter': 'social media', 'x': 'social media', 'tiktok': 'social media',
+  'snapchat': 'social media', 'linkedin': 'social media', 'pinterest': 'social media',
+  'reddit': 'social media', 'youtube': 'social media',
+  
+  // CRM
+  'salesforce': 'crm', 'hubspot': 'crm', 'zoho': 'crm', 'pipedrive': 'crm',
+  
+  // Project Management
+  'asana': 'project management', 'trello': 'project management', 'monday': 'project management',
+  'jira': 'project management', 'notion': 'project management', 'clickup': 'project management',
+  
+  // Communication
+  'slack': 'communication', 'microsoft teams': 'communication', 'teams': 'communication',
+  'zoom': 'communication', 'discord': 'communication',
+  
+  // E-commerce
+  'shopify': 'ecommerce', 'amazon': 'ecommerce', 'ebay': 'ecommerce', 'etsy': 'ecommerce',
+  
+  // Cloud
+  'aws': 'cloud', 'azure': 'cloud', 'google cloud': 'cloud', 'heroku': 'cloud',
+  'vercel': 'cloud', 'netlify': 'cloud',
+  
+  // Search
+  'google': 'search', 'bing': 'search', 'duckduckgo': 'search',
+  
+  // Streaming
+  'netflix': 'streaming', 'spotify': 'streaming', 'disney+': 'streaming', 'hulu': 'streaming'
+};
 
 /**
- * Find all brand mentions in text
+ * Detect the industry of a brand
+ * @param {string} brandName - The brand name
+ * @returns {string|null} The detected industry
+ */
+function detectBrandIndustry(brandName) {
+  const normalized = brandName.toLowerCase().trim();
+  
+  // Direct lookup
+  if (BRAND_TO_INDUSTRY[normalized]) {
+    return BRAND_TO_INDUSTRY[normalized];
+  }
+  
+  // Check if it's in any industry competitor list
+  for (const [industry, brands] of Object.entries(INDUSTRY_COMPETITORS)) {
+    if (brands.some(b => normalized.includes(b) || b.includes(normalized))) {
+      return industry;
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Get competitors for a specific brand based on its industry
+ * @param {string} brandName - The target brand
+ * @returns {Array} List of competitor names to look for
+ */
+function getIndustryCompetitors(brandName) {
+  const industry = detectBrandIndustry(brandName);
+  
+  if (!industry || !INDUSTRY_COMPETITORS[industry]) {
+    return []; // Unknown industry - don't assume competitors
+  }
+  
+  // Return competitors in the same industry, excluding the target brand
+  const normalized = brandName.toLowerCase();
+  return INDUSTRY_COMPETITORS[industry].filter(comp => 
+    comp !== normalized && !normalized.includes(comp) && !comp.includes(normalized)
+  );
+}
+
+/**
+ * Find all brand mentions in text (industry-aware)
  * @param {string} text - The response text to analyze
  * @param {string} targetBrand - The brand we're tracking
  * @returns {Array} Array of mentions with positions
@@ -34,8 +215,11 @@ function findBrandMentions(text, targetBrand) {
   const mentions = [];
   let position = 1;
 
-  // Combine known brands with target brand
-  const brandsToFind = [...new Set([targetBrand.toLowerCase(), ...KNOWN_BRANDS])];
+  // Get industry-specific competitors only
+  const industryCompetitors = getIndustryCompetitors(targetBrand);
+  
+  // Combine target brand with its ACTUAL industry competitors
+  const brandsToFind = [...new Set([targetBrand.toLowerCase(), ...industryCompetitors])];
 
   // Find all brand occurrences with their character positions
   const brandPositions = [];
@@ -198,5 +382,7 @@ module.exports = {
   analyzeResponse,
   analyzeAllResponses,
   isTargetMentioned,
-  KNOWN_BRANDS
+  detectBrandIndustry,
+  getIndustryCompetitors,
+  INDUSTRY_COMPETITORS
 };
