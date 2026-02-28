@@ -229,10 +229,47 @@ const INDUSTRY_USE_CASES = {
     'auto-scaling', 'load balancing', 'database management', 'backup and recovery',
     'cloud migration', 'cost optimization', 'multi-cloud', 'edge computing'
   ],
+  // NON-TECH INDUSTRIES
+  'sportswear': [
+    'running shoes', 'athletic apparel', 'sports equipment', 'workout gear',
+    'training shoes', 'athletic footwear', 'sports clothing', 'fitness apparel',
+    'basketball shoes', 'soccer cleats', 'gym wear', 'activewear'
+  ],
+  'fashion': [
+    'clothing', 'apparel', 'accessories', 'shoes', 'luxury fashion',
+    'streetwear', 'designer clothes', 'affordable fashion', 'sustainable fashion'
+  ],
+  'food & beverage': [
+    'fast food', 'restaurants', 'coffee shops', 'delivery', 'beverages',
+    'snacks', 'organic food', 'meal kits', 'grocery', 'drinks'
+  ],
+  'automotive': [
+    'cars', 'vehicles', 'electric vehicles', 'SUVs', 'trucks',
+    'car buying', 'auto financing', 'car maintenance', 'driving'
+  ],
+  'retail': [
+    'online shopping', 'stores', 'products', 'deals', 'discounts',
+    'home goods', 'electronics', 'shopping experience', 'customer service'
+  ],
+  'entertainment': [
+    'streaming', 'movies', 'TV shows', 'music', 'gaming',
+    'live events', 'concerts', 'sports viewing', 'content'
+  ],
+  'travel': [
+    'flights', 'hotels', 'vacation', 'booking', 'travel deals',
+    'destinations', 'travel planning', 'airlines', 'accommodations'
+  ],
+  'healthcare': [
+    'health services', 'medical care', 'wellness', 'fitness',
+    'mental health', 'telemedicine', 'health insurance', 'pharmacy'
+  ],
+  'banking': [
+    'checking accounts', 'savings', 'loans', 'credit cards',
+    'mobile banking', 'investments', 'mortgages', 'financial services'
+  ],
   'default': [
-    'workflow automation', 'team productivity', 'business operations', 
-    'data management', 'collaboration', 'reporting', 'process optimization',
-    'integration', 'automation', 'efficiency improvement'
+    'products', 'services', 'quality', 'customer experience',
+    'value', 'reliability', 'innovation', 'brand'
   ]
 };
 
@@ -363,8 +400,8 @@ async function generateQueriesWithAI(brand, industry = null, options = {}) {
     // Use AI-detected information
     return generateEnhancedQueries(brand, aiAnalysis, { queriesPerType, maxTotalQueries });
   } else {
-    // Fallback to basic generation
-    const detectedIndustry = industry || inferIndustry(brand);
+    // Fallback to basic generation - use inferred or passed industry
+    const detectedIndustry = industry || inferIndustry(brand) || 'general';
     return generateQueries(brand, detectedIndustry, options);
   }
 }
@@ -382,9 +419,9 @@ function generateEnhancedQueries(brand, analysis, options = {}) {
   const queries = [];
   
   const {
-    industry = 'software',
+    industry = 'general',
     specificField = industry,
-    targetAudience = 'businesses',
+    targetAudience = 'consumers',
     mainUseCases = [],
     topCompetitors = [],
     keyFeatures = [],
@@ -579,17 +616,28 @@ function inferIndustry(domain) {
   const domainLower = domain.toLowerCase();
   
   const industryKeywords = {
+    // TECH INDUSTRIES
     'crm': ['salesforce', 'hubspot', 'pipedrive', 'zoho', 'crm'],
     'marketing': ['mailchimp', 'sendgrid', 'marketo', 'buffer', 'hootsuite'],
-    'ecommerce': ['shopify', 'woocommerce', 'bigcommerce', 'magento', 'store'],
+    'ecommerce': ['shopify', 'woocommerce', 'bigcommerce', 'magento'],
     'project management': ['asana', 'trello', 'monday', 'jira', 'notion', 'clickup'],
-    'analytics': ['google analytics', 'mixpanel', 'amplitude', 'tableau', 'looker'],
+    'analytics': ['mixpanel', 'amplitude', 'tableau', 'looker'],
     'communication': ['slack', 'discord', 'teams', 'zoom', 'meet'],
     'development': ['github', 'gitlab', 'bitbucket', 'vercel', 'netlify'],
     'design': ['figma', 'sketch', 'adobe', 'canva', 'invision'],
     'hr': ['workday', 'bamboohr', 'gusto', 'rippling', 'lever'],
-    'finance': ['quickbooks', 'xero', 'stripe', 'square', 'wave'],
-    'social media': ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'youtube']
+    'finance': ['quickbooks', 'xero', 'stripe', 'square', 'wave', 'paypal', 'venmo'],
+    'social media': ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'youtube', 'snapchat', 'reddit'],
+    // NON-TECH INDUSTRIES
+    'sportswear': ['nike', 'adidas', 'puma', 'under armour', 'reebok', 'new balance', 'asics', 'lululemon', 'fila', 'converse'],
+    'fashion': ['zara', 'h&m', 'gucci', 'louis vuitton', 'prada', 'chanel', 'uniqlo', 'gap', 'levis', 'ralph lauren', 'burberry'],
+    'food & beverage': ['mcdonald', 'starbucks', 'coca-cola', 'pepsi', 'burger king', 'subway', 'chipotle', 'domino', 'kfc', 'dunkin', 'wendy'],
+    'automotive': ['tesla', 'toyota', 'ford', 'bmw', 'mercedes', 'honda', 'chevrolet', 'audi', 'volkswagen', 'porsche', 'ferrari', 'hyundai'],
+    'retail': ['amazon', 'walmart', 'target', 'costco', 'ikea', 'home depot', 'best buy', 'ebay', 'alibaba', 'etsy'],
+    'entertainment': ['netflix', 'disney', 'spotify', 'hbo', 'hulu', 'paramount', 'warner', 'sony', 'universal'],
+    'travel': ['airbnb', 'booking', 'expedia', 'tripadvisor', 'marriott', 'hilton', 'united', 'delta', 'southwest', 'american airlines'],
+    'healthcare': ['cvs', 'walgreens', 'unitedhealth', 'pfizer', 'johnson', 'moderna', 'aetna', 'cigna'],
+    'banking': ['chase', 'bank of america', 'wells fargo', 'citi', 'capital one', 'goldman', 'morgan stanley', 'hsbc']
   };
 
   for (const [industry, keywords] of Object.entries(industryKeywords)) {
@@ -598,7 +646,8 @@ function inferIndustry(domain) {
     }
   }
 
-  return 'software';
+  // Don't default to software - return null so AI can detect
+  return null;
 }
 
 /**
