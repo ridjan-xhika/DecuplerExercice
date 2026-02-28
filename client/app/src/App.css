@@ -289,10 +289,20 @@ body {
   font-weight: 600;
 }
 
+.stat-value.highlight {
+  color: var(--accent-green);
+  font-size: 2rem;
+}
+
 .stat-label {
   color: var(--text-secondary);
   font-size: 0.85rem;
   margin-top: 0.25rem;
+}
+
+.stat-item.ranking-stat {
+  background: linear-gradient(135deg, var(--bg-card) 0%, rgba(59, 130, 246, 0.2) 100%);
+  border: 1px solid var(--accent-blue);
 }
 
 /* Competitors List */

@@ -559,7 +559,20 @@ function generateQueries(brand, industry = 'general', options = {}) {
     });
   }
 
-  // PRIORITY 3: Product discovery queries (the key improvement!)
+  // PRIORITY 3: RANKING QUERIES (CRITICAL - tests organic visibility)
+  const rankingTemplates = QUERY_TEMPLATES.ranking || [];
+  for (let i = 0; i < Math.min(3, rankingTemplates.length); i++) {
+    const productType = getRandomItem(industryData.productTypes);
+    const productAction = getRandomItem(industryData.productActions);
+    queries.push({
+      queryText: rankingTemplates[i]
+        .replace(/{productType}/g, productType)
+        .replace(/{productAction}/g, productAction),
+      queryType: 'ranking'
+    });
+  }
+
+  // PRIORITY 4: Product discovery queries (NO brand - tests organic visibility)
   const discoveryTemplates = QUERY_TEMPLATES.productDiscovery || [];
   for (let i = 0; i < Math.min(5, discoveryTemplates.length); i++) {
     const productType = getRandomItem(industryData.productTypes);
@@ -572,7 +585,7 @@ function generateQueries(brand, industry = 'general', options = {}) {
     });
   }
 
-  // PRIORITY 4: Best queries (product-specific)
+  // PRIORITY 5: Best queries (product-specific, NO brand)
   const bestTemplates = QUERY_TEMPLATES.bestQueries || [];
   for (let i = 0; i < Math.min(4, bestTemplates.length); i++) {
     const productType = getRandomItem(industryData.productTypes);
@@ -586,32 +599,7 @@ function generateQueries(brand, industry = 'general', options = {}) {
     });
   }
 
-  // PRIORITY 5: Alternatives and review queries
-  const altTemplates = QUERY_TEMPLATES.alternatives || [];
-  for (let i = 0; i < Math.min(3, altTemplates.length); i++) {
-    const productType = getRandomItem(industryData.productTypes);
-    const productAction = getRandomItem(industryData.productActions);
-    queries.push({
-      queryText: altTemplates[i]
-        .replace(/{brand}/g, brand)
-        .replace(/{productType}/g, productType)
-        .replace(/{productAction}/g, productAction),
-      queryType: 'alternatives'
-    });
-  }
-
-  const reviewTemplates = QUERY_TEMPLATES.review || [];
-  for (let i = 0; i < Math.min(2, reviewTemplates.length); i++) {
-    const productAction = getRandomItem(industryData.productActions);
-    queries.push({
-      queryText: reviewTemplates[i]
-        .replace(/{brand}/g, brand)
-        .replace(/{productAction}/g, productAction),
-      queryType: 'review'
-    });
-  }
-
-  // PRIORITY 6: Use case queries
+  // PRIORITY 6: Use case queries (NO brand)
   const useCases = industryData.useCases || [];
   const useCaseTemplates = QUERY_TEMPLATES.useCase || [];
   for (let i = 0; i < Math.min(2, useCases.length); i++) {

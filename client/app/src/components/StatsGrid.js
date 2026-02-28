@@ -29,6 +29,20 @@ function StatsGrid({ stats }) {
         <div className="stat-value">{stats.avgPosition?.toFixed(1) || 'N/A'}</div>
         <div className="stat-label">Avg Position</div>
       </div>
+      
+      {/* NEW: Ranking Stats */}
+      {stats.ranking && (
+        <>
+          <div className="stat-item ranking-stat">
+            <div className="stat-value highlight">#{stats.ranking.bestRank || 'N/A'}</div>
+            <div className="stat-label">Best Industry Rank</div>
+          </div>
+          <div className="stat-item ranking-stat">
+            <div className="stat-value">{stats.ranking.averageRank?.toFixed(1) || 'N/A'}</div>
+            <div className="stat-label">Avg Industry Rank</div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
