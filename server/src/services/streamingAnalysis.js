@@ -82,6 +82,9 @@ async function runStreamingAnalysis(domainName, options, sendEvent) {
     // Step 3: Generate queries
     sendEvent('status', { phase: 'generating', message: 'Generating test queries...' });
     
+    // Clear old prompts for this domain to avoid accumulation
+    await Prompt.deleteByDomainId(domain.id);
+    
     const enhancedOptions = {
       targetAudience,
       mainUseCases,
@@ -103,14 +106,17 @@ async function runStreamingAnalysis(domainName, options, sendEvent) {
     });
 
     // Save queries to database
+    const savedPrompts = [];
     for (const query of queries) {
-      await Prompt.create(domain.id, query.queryText, query.queryType);
+      const saved = await Prompt.create(domain.id, query.queryText, query.queryType);
+      savedPrompts.push({ ...saved, query_text: query.queryText, query_type: query.queryType });
     }
 
     // Step 4: Process each query and stream results
     sendEvent('status', { phase: 'querying', message: `Running ${queries.length} queries against AI providers...` });
 
-    const prompts = await Prompt.findByDomainId(domain.id);
+    // Use the saved prompts directly instead of fetching all from DB
+    const prompts = savedPrompts;
     let successfulPrompts = 0;
     let failedPrompts = 0;
     let totalResponses = 0;

@@ -1,155 +1,130 @@
 /**
  * Query Generator Service - Enhanced Version
  * Generates comprehensive user prompts to test brand visibility in AI responses
- * Uses SPECIFIC product/service queries, not generic "software" questions
+ * 
+ * TWO TYPES OF QUERIES:
+ * 1. BRAND QUERIES - Mention the brand directly (test direct visibility)
+ * 2. DISCOVERY QUERIES - Don't mention brand (test if AI naturally recommends it)
  */
 
 const { askAllProviders } = require('./aiClient');
 
 // Comprehensive query templates by category
-// Uses {productAction} for what the product does (e.g., "stream music", "buy shoes", "order food")
-// Uses {productType} for the product category (e.g., "music streaming app", "running shoes", "burger")
+// IMPORTANT: Discovery queries should NOT mention {brand} - we want to see if AI naturally recommends it
 const QUERY_TEMPLATES = {
-  // === DIRECT BRAND QUERIES (HIGH PRIORITY - Should always mention the brand) ===
+  // =============================================================================
+  // BRAND QUERIES - These mention the brand directly
+  // Used to test: Does the AI know about this brand? What does it say?
+  // =============================================================================
+  
   directBrand: [
     "What is {brand}?",
     "Tell me about {brand}",
     "What does {brand} do?",
     "Explain what {brand} is",
-    "Is {brand} good for {productAction}?",
-    "What is {brand} used for?",
-    "Who uses {brand}?",
-    "How would you describe {brand}?",
-    "What kind of {productType} is {brand}?",
     "Give me an overview of {brand}"
   ],
 
-  // === BRAND OPINION/RATING QUERIES ===
   brandOpinion: [
     "How do you rate {brand}?",
     "What do you think of {brand}?",
     "Is {brand} any good?",
-    "Would you recommend {brand} for {productAction}?",
     "How good is {brand}?",
-    "What's your opinion on {brand}?",
-    "Rate {brand} out of 10",
-    "Is {brand} worth it?",
-    "Should I use {brand} to {productAction}?",
-    "Give me your honest take on {brand}"
+    "Rate {brand} out of 10"
   ],
 
-  // === PRODUCT/SERVICE DISCOVERY QUERIES (What people actually search) ===
-  productDiscovery: [
-    "Where can I {productAction}?",
-    "Best way to {productAction}?",
-    "How do I {productAction}?",
-    "What app should I use to {productAction}?",
-    "Best {productType} options?",
-    "What's the best {productType}?",
-    "Looking for a {productType}",
-    "I want to {productAction}, what should I use?",
-    "Recommend a {productType}",
-    "Top {productType} right now?"
-  ],
-
-  // === BEST/TOP QUERIES (Product-specific) ===
-  bestQueries: [
-    "What's the best {productType}?",
-    "Best place to {productAction}?",
-    "Top {productType} in 2024?",
-    "What's the most popular {productType}?",
-    "Best {productType} for {targetAudience}?",
-    "Which {productType} is number one?",
-    "Leading {productType}?",
-    "Top rated {productType}?",
-    "Best {productType} you'd recommend?",
-    "What's the go-to {productType}?"
-  ],
-
-  // === COMPARISON QUERIES ===
+  // Comparison still uses brand name - comparing brand to competitors
   comparison: [
     "How does {brand} compare to {competitor}?",
     "{brand} vs {competitor}?",
     "Is {brand} better than {competitor}?",
-    "{brand} or {competitor} for {productAction}?",
     "Compare {brand} and {competitor}",
-    "Which is better: {brand} or {competitor}?",
-    "{brand} vs {competitor} - which should I choose?",
-    "Should I use {brand} or {competitor}?",
-    "Difference between {brand} and {competitor}?"
+    "Which is better: {brand} or {competitor}?"
   ],
 
-  // === ALTERNATIVES QUERIES ===
-  alternatives: [
-    "Alternatives to {brand}?",
-    "What's like {brand}?",
-    "Similar to {brand}?",
-    "{productType} like {brand}",
-    "What competes with {brand}?",
-    "{brand} competitors?",
-    "Other {productType} besides {brand}?",
-    "What else can I use instead of {brand}?",
-    "Anything better than {brand} for {productAction}?"
+  // =============================================================================
+  // DISCOVERY QUERIES - These do NOT mention the brand
+  // Used to test: Does the AI naturally recommend this brand?
+  // This is the TRUE test of AI visibility
+  // =============================================================================
+
+  // Product discovery - natural search queries
+  productDiscovery: [
+    "Where can I {productAction}?",
+    "Best way to {productAction}?",
+    "How do I {productAction}?",
+    "What should I use to {productAction}?",
+    "I want to {productAction}, what do you recommend?",
+    "Help me {productAction}",
+    "What's the easiest way to {productAction}?",
+    "Recommend something to {productAction}"
   ],
 
-  // === USE CASE QUERIES ===
+  // Best/Top queries - no brand mentioned
+  bestQueries: [
+    "What's the best {productType}?",
+    "Best {productType} right now?",
+    "Top {productType} in 2024?",
+    "What's the most popular {productType}?",
+    "Which {productType} is number one?",
+    "Leading {productType}?",
+    "Top rated {productType}?",
+    "What {productType} do you recommend?",
+    "Most trusted {productType}?"
+  ],
+
+  // Use case queries - no brand mentioned
   useCase: [
     "Best {productType} for {useCase}?",
     "What should I use for {useCase}?",
     "I need to {useCase}, what's best?",
     "What's good for {useCase}?",
-    "I need a {productType} for {useCase}",
     "Recommend something for {useCase}",
-    "Best way to handle {useCase}?",
-    "How do I {useCase}?",
-    "Help me with {useCase}"
+    "How do I {useCase}?"
   ],
 
-  // === PRICING QUERIES ===
-  pricing: [
-    "Is {brand} free?",
-    "How much does {brand} cost?",
-    "{brand} pricing?",
-    "Is {brand} expensive?",
-    "Does {brand} have a free plan?",
-    "What does {brand} cost?",
-    "{brand} subscription price?",
-    "Free {productType} options?",
-    "Cheap {productType} alternatives?"
-  ],
-
-  // === REVIEW/RATING QUERIES ===
-  review: [
-    "{brand} reviews?",
-    "Is {brand} legit?",
-    "{brand} worth the money?",
-    "Any issues with {brand}?",
-    "Problems with {brand}?",
-    "{brand} pros and cons?",
-    "Honest review of {brand}?",
-    "What's wrong with {brand}?",
-    "Is {brand} reliable for {productAction}?"
-  ],
-
-  // === AUDIENCE-SPECIFIC QUERIES ===
+  // Audience specific - no brand mentioned
   audienceSpecific: [
     "Best {productType} for beginners?",
     "{productType} for professionals?",
     "Best {productType} for {targetAudience}?",
-    "{productType} for kids?",
     "Easy {productType} to use?",
-    "{productType} for casual users?",
     "Premium {productType} options?",
     "Best {productType} for families?"
   ],
 
-  // === REGIONAL QUERIES ===
+  // =============================================================================
+  // RANKING QUERIES - Ask AI to rank companies (CRITICAL for visibility score)
+  // =============================================================================
+  
+  ranking: [
+    "Rank the top 10 {productType} companies",
+    "List the best {productType} brands in order",
+    "Give me a ranking of {productType} from best to worst",
+    "What are the top 5 companies for {productAction}?",
+    "Rank the leading {productType} providers",
+    "Create a tier list of {productType}",
+    "Which {productType} would you rank #1?",
+    "Order these by quality: what are the best {productType}?"
+  ],
+
+  // =============================================================================
+  // PRICING QUERIES - Mix of brand and non-brand
+  // =============================================================================
+  
+  pricing: [
+    "Free {productType} options?",
+    "Cheap {productType} alternatives?",
+    "Best free {productType}?",
+    "Affordable {productType}?",
+    "What {productType} is free?"
+  ],
+
+  // Regional queries - no brand mentioned
   regional: [
     "Best {productType} in {region}?",
-    "{productType} available in {region}?",
-    "Is {brand} available in {region}?",
     "Top {productType} in {region}?",
-    "Where to {productAction} in {region}?"
+    "What {productType} is popular in {region}?"
   ]
 };
 
