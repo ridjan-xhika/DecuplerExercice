@@ -8,6 +8,33 @@ const { askAllProviders } = require('./aiClient');
 
 // Comprehensive query templates by category
 const QUERY_TEMPLATES = {
+  // === DIRECT BRAND QUERIES (HIGH PRIORITY - Should always mention the brand) ===
+  directBrand: [
+    "What is {brand}?",
+    "Tell me about {brand}",
+    "What does {brand} do?",
+    "How does {brand} work?",
+    "What is {brand} used for?",
+    "Who uses {brand}?",
+    "What company makes {brand}?",
+    "Is {brand} any good?",
+    "What are the main features of {brand}?",
+    "Give me an overview of {brand}"
+  ],
+
+  // === BRAND OPINION QUERIES (Should mention brand in response) ===
+  brandOpinion: [
+    "Should I use {brand}?",
+    "Is {brand} worth trying?",
+    "What do you think about {brand}?",
+    "Would you recommend {brand}?",
+    "Is {brand} good for {useCase}?",
+    "Can {brand} help with {useCase}?",
+    "Is {brand} the right choice for me?",
+    "Why should I use {brand}?",
+    "What are the benefits of using {brand}?"
+  ],
+
   // === COMPARISON QUERIES ===
   generalComparison: [
     "What's the difference between {brand} and its competitors?",
@@ -52,7 +79,7 @@ const QUERY_TEMPLATES = {
     "{brand} migration guide from {competitor}"
   ],
   
-  // === RECOMMENDATION QUERIES ===
+  // === RECOMMENDATION QUERIES (Industry-focused, brand may or may not appear) ===
   recommendation: [
     "What's the best {industry} tool in 2025?",
     "Which {industry} platform do you recommend?",
@@ -433,7 +460,7 @@ async function generateQueriesWithAI(brand, industry = null, options = {}) {
  * @returns {Array} Array of query objects
  */
 function generateEnhancedQueries(brand, analysis, options = {}) {
-  const { queriesPerType = 3, maxTotalQueries = 35 } = options;
+  const { queriesPerType = 3, maxTotalQueries = 40 } = options;
   const queries = [];
   
   const {
@@ -448,6 +475,7 @@ function generateEnhancedQueries(brand, analysis, options = {}) {
 
   // Helper to add queries from templates
   const addQueries = (templates, type, count = queriesPerType, replacements = {}) => {
+    if (!templates) return;
     const shuffled = [...templates].sort(() => Math.random() - 0.5);
     const selected = shuffled.slice(0, count);
     
@@ -471,9 +499,26 @@ function generateEnhancedQueries(brand, analysis, options = {}) {
     }
   };
 
-  // 1. DIRECT COMPETITOR COMPARISONS - Very important for visibility
+  // ============ HIGH PRIORITY: DIRECT BRAND QUERIES ============
+  // These queries DIRECTLY ask about the brand - should guarantee mentions
+  
+  // 1. DIRECT BRAND QUERIES - "What is {brand}?" type queries (5-6 queries)
+  addQueries(QUERY_TEMPLATES.directBrand, 'directBrand', 6);
+  
+  // 2. BRAND OPINION QUERIES - "Should I use {brand}?" type queries (4-5 queries)
+  if (mainUseCases.length > 0) {
+    const useCase = mainUseCases[0];
+    addQueries(QUERY_TEMPLATES.brandOpinion, 'brandOpinion', 5, { useCase });
+  } else {
+    addQueries(QUERY_TEMPLATES.brandOpinion, 'brandOpinion', 5, { useCase: 'my needs' });
+  }
+
+  // ============ MEDIUM PRIORITY: COMPARATIVE QUERIES ============
+  // These mention the brand in the query, likely to mention in response
+
+  // 3. DIRECT COMPETITOR COMPARISONS (up to 6 queries)
   if (topCompetitors.length > 0) {
-    const competitorsToCompare = topCompetitors.slice(0, 5);
+    const competitorsToCompare = topCompetitors.slice(0, 3);
     for (const competitor of competitorsToCompare) {
       const useCase = mainUseCases[Math.floor(Math.random() * mainUseCases.length)] || 'business needs';
       addQueries(QUERY_TEMPLATES.directComparison, 'directComparison', 2, { 
@@ -483,77 +528,50 @@ function generateEnhancedQueries(brand, analysis, options = {}) {
     }
   }
 
-  // 2. SWITCHING QUERIES - Good for competitor positioning
+  // 4. GENERAL COMPARISONS (3 queries)
+  addQueries(QUERY_TEMPLATES.generalComparison, 'comparison', 3);
+
+  // 5. ALTERNATIVES QUERIES - Asks about brand alternatives (3 queries)
+  addQueries(QUERY_TEMPLATES.alternatives, 'alternatives', 3);
+
+  // 6. REVIEW & REPUTATION QUERIES - Direct brand mentions (4 queries)
+  addQueries(QUERY_TEMPLATES.review, 'review', 2);
+  addQueries(QUERY_TEMPLATES.reputation, 'reputation', 2);
+
+  // 7. PRICING QUERIES - Direct brand pricing (2 queries)
   if (topCompetitors.length > 0) {
-    const mainCompetitors = topCompetitors.slice(0, 2);
-    for (const competitor of mainCompetitors) {
-      addQueries(QUERY_TEMPLATES.switching, 'switching', 1, { competitor });
-    }
+    const competitor = topCompetitors[0];
+    addQueries(QUERY_TEMPLATES.pricing, 'pricing', 2, { competitor });
+  } else {
+    addQueries(QUERY_TEMPLATES.pricing, 'pricing', 2);
   }
 
-  // 3. GENERAL COMPARISONS
-  addQueries(QUERY_TEMPLATES.generalComparison, 'comparison', queriesPerType);
+  // 8. FEATURES QUERIES - What does brand offer (2 queries)
+  if (keyFeatures && keyFeatures.length > 0) {
+    const feature = keyFeatures[0];
+    addQueries(QUERY_TEMPLATES.features, 'features', 2, { feature });
+  } else {
+    addQueries(QUERY_TEMPLATES.features, 'features', 2);
+  }
 
-  // 4. ALTERNATIVES QUERIES
-  addQueries(QUERY_TEMPLATES.alternatives, 'alternatives', queriesPerType);
+  // ============ LOWER PRIORITY: DISCOVERY QUERIES ============
+  // These are industry queries where brand may or may not appear
 
-  // 5. RECOMMENDATION QUERIES
-  addQueries(QUERY_TEMPLATES.recommendation, 'recommendation', queriesPerType);
+  // 9. RECOMMENDATION QUERIES (2 queries)
+  addQueries(QUERY_TEMPLATES.recommendation, 'recommendation', 2);
 
-  // 6. AUDIENCE-SPECIFIC QUERIES
-  addQueries(QUERY_TEMPLATES.audienceSpecific, 'audienceSpecific', queriesPerType);
-
-  // 7. USE CASE SPECIFIC QUERIES - Using actual use cases from analysis
+  // 10. USE CASE SPECIFIC QUERIES (up to 3 queries)
   if (mainUseCases.length > 0) {
-    const useCasesToQuery = mainUseCases.slice(0, 4);
+    const useCasesToQuery = mainUseCases.slice(0, 3);
     for (const useCase of useCasesToQuery) {
       addQueries(QUERY_TEMPLATES.useCaseSpecific, 'useCaseSpecific', 1, { useCase });
     }
   }
 
-  // 8. REVIEW & REPUTATION QUERIES
-  addQueries(QUERY_TEMPLATES.review, 'review', queriesPerType);
-  addQueries(QUERY_TEMPLATES.reputation, 'reputation', 2);
+  // 11. BEST-OF QUERIES (2 queries)
+  addQueries(QUERY_TEMPLATES.bestOf, 'bestOf', 2);
 
-  // 9. PRICING QUERIES
-  if (topCompetitors.length > 0) {
-    const competitor = topCompetitors[0];
-    addQueries(QUERY_TEMPLATES.pricing, 'pricing', queriesPerType, { competitor });
-  } else {
-    addQueries(QUERY_TEMPLATES.pricing, 'pricing', queriesPerType);
-  }
-
-  // 10. BEST-OF & RANKINGS QUERIES
-  addQueries(QUERY_TEMPLATES.bestOf, 'bestOf', queriesPerType);
-  addQueries(QUERY_TEMPLATES.rankings, 'rankings', 2);
-
-  // 11. MARKET & INDUSTRY QUERIES
-  addQueries(QUERY_TEMPLATES.market, 'market', 2);
-
-  // 12. FEATURES QUERIES
-  if (keyFeatures && keyFeatures.length > 0) {
-    const featuresToQuery = keyFeatures.slice(0, 2);
-    for (const feature of featuresToQuery) {
-      addQueries(QUERY_TEMPLATES.features, 'features', 1, { feature });
-    }
-  } else {
-    addQueries(QUERY_TEMPLATES.features, 'features', 2);
-  }
-
-  // 13. INTEGRATION QUERIES
-  const integration = COMMON_INTEGRATIONS[Math.floor(Math.random() * COMMON_INTEGRATIONS.length)];
-  addQueries(QUERY_TEMPLATES.integration, 'integration', 2, { integration });
-
-  // 14. PROBLEM-SOLVING QUERIES
-  if (mainUseCases.length > 0) {
-    const useCase = mainUseCases[0];
-    addQueries(QUERY_TEMPLATES.problemSolving, 'problemSolving', 2, { useCase });
-  }
-
-  // 15. DISCOVERY QUERIES
-  addQueries(QUERY_TEMPLATES.discovery, 'discovery', 2);
-
-  // 16. REGIONAL QUERIES (if region provided)
+  // 12. REGIONAL QUERIES (if region provided)
   if (region) {
     addQueries(QUERY_TEMPLATES.regional, 'regional', 2, { region });
   }
@@ -570,11 +588,12 @@ function generateEnhancedQueries(brand, analysis, options = {}) {
     }
   }
 
-  // Shuffle for variety and limit total
-  const shuffled = uniqueQueries.sort(() => Math.random() - 0.5);
-  const result = shuffled.slice(0, maxTotalQueries);
+  // DON'T shuffle - keep high priority queries first
+  // Just limit to max total
+  const result = uniqueQueries.slice(0, maxTotalQueries);
   
   console.log(`Generated ${result.length} unique queries for ${brand}`);
+  console.log(`Query breakdown: ${result.filter(q => q.queryType === 'directBrand').length} direct brand, ${result.filter(q => q.queryType === 'brandOpinion').length} brand opinion, ${result.filter(q => q.queryType === 'directComparison').length} comparisons`);
   return result;
 }
 
@@ -584,15 +603,35 @@ function generateEnhancedQueries(brand, analysis, options = {}) {
 function generateQueries(brand, industry = 'software', options = {}) {
   const {
     queriesPerType = 2,
-    includeTypes = ['generalComparison', 'alternatives', 'recommendation', 'review', 'bestOf', 'pricing'],
     includeUseCases = true
   } = options;
 
   const queries = [];
   const useCases = INDUSTRY_USE_CASES[industry.toLowerCase()] || INDUSTRY_USE_CASES.default;
 
-  // Generate queries for each type
-  for (const type of includeTypes) {
+  // PRIORITY 1: Direct brand queries (always include these)
+  const directBrandTemplates = QUERY_TEMPLATES.directBrand || [];
+  for (let i = 0; i < Math.min(5, directBrandTemplates.length); i++) {
+    queries.push({
+      queryText: directBrandTemplates[i].replace(/{brand}/g, brand),
+      queryType: 'directBrand'
+    });
+  }
+
+  // PRIORITY 2: Brand opinion queries
+  const brandOpinionTemplates = QUERY_TEMPLATES.brandOpinion || [];
+  for (let i = 0; i < Math.min(4, brandOpinionTemplates.length); i++) {
+    queries.push({
+      queryText: brandOpinionTemplates[i]
+        .replace(/{brand}/g, brand)
+        .replace(/{useCase}/g, useCases[0] || 'my needs'),
+      queryType: 'brandOpinion'
+    });
+  }
+
+  // PRIORITY 3: Comparison, alternatives, review queries
+  const otherTypes = ['generalComparison', 'alternatives', 'review', 'pricing'];
+  for (const type of otherTypes) {
     const templates = QUERY_TEMPLATES[type];
     if (!templates) continue;
 
@@ -612,9 +651,21 @@ function generateQueries(brand, industry = 'software', options = {}) {
     }
   }
 
+  // PRIORITY 4: Industry recommendation queries
+  const recTemplates = QUERY_TEMPLATES.recommendation || [];
+  for (let i = 0; i < Math.min(2, recTemplates.length); i++) {
+    queries.push({
+      queryText: recTemplates[i]
+        .replace(/{brand}/g, brand)
+        .replace(/{industry}/g, industry)
+        .replace(/{targetAudience}/g, 'businesses'),
+      queryType: 'recommendation'
+    });
+  }
+
   // Add use case queries
   if (includeUseCases) {
-    const useCaseQueries = useCases.slice(0, 3).map(useCase => {
+    const useCaseQueries = useCases.slice(0, 2).map(useCase => {
       const templates = QUERY_TEMPLATES.useCaseSpecific;
       const template = templates[Math.floor(Math.random() * templates.length)];
       return {
