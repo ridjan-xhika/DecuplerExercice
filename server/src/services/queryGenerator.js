@@ -13,98 +13,143 @@ const QUERY_TEMPLATES = {
     "What is {brand}?",
     "Tell me about {brand}",
     "What does {brand} do?",
-    "How does {brand} work?",
+    "Explain what {brand} is",
+    "Give me info on {brand}",
     "What is {brand} used for?",
     "Who uses {brand}?",
-    "What company makes {brand}?",
-    "Is {brand} any good?",
-    "What are the main features of {brand}?",
+    "How would you describe {brand}?",
+    "What kind of company is {brand}?",
     "Give me an overview of {brand}"
   ],
 
-  // === BRAND OPINION QUERIES (Should mention brand in response) ===
+  // === BRAND OPINION/RATING QUERIES ===
   brandOpinion: [
-    "Should I use {brand}?",
-    "Is {brand} worth trying?",
-    "What do you think about {brand}?",
+    "How do you rate {brand}?",
+    "What do you think of {brand}?",
+    "Is {brand} any good?",
     "Would you recommend {brand}?",
-    "Is {brand} good for {useCase}?",
-    "Can {brand} help with {useCase}?",
-    "Is {brand} the right choice for me?",
-    "Why should I use {brand}?",
-    "What are the benefits of using {brand}?"
+    "How good is {brand}?",
+    "What's your opinion on {brand}?",
+    "Rate {brand} out of 10",
+    "Is {brand} worth using?",
+    "Should I try {brand}?",
+    "Give me your honest take on {brand}"
   ],
 
-  // === COMPARISON QUERIES ===
-  generalComparison: [
-    "What's the difference between {brand} and its competitors?",
-    "How does {brand} compare to other {industry} tools?",
-    "{brand} vs competitors: which one should I choose?",
-    "Is {brand} better than alternatives in {industry}?",
-    "Compare {brand} with similar {industry} solutions",
-    "How does {brand} stack up against the competition?",
-    "{brand} comparison with top {industry} tools 2025"
+  // === NATURAL DISCOVERY QUERIES ===
+  naturalDiscovery: [
+    "Give me some {industry} apps",
+    "Name some {industry} tools",
+    "List some {industry} companies",
+    "What are some {industry} platforms?",
+    "Show me some {industry} options",
+    "What {industry} apps exist?",
+    "Tell me about {industry} software",
+    "Give me {industry} recommendations",
+    "What {industry} services are out there?",
+    "Name a few {industry} solutions"
   ],
-  
-  directComparison: [
-    "{brand} vs {competitor}: which is better?",
-    "Should I choose {brand} or {competitor}?",
-    "{brand} compared to {competitor} for {useCase}",
-    "Differences between {brand} and {competitor}",
-    "Is {brand} better than {competitor} for {industry}?",
-    "{brand} or {competitor}: pros and cons",
-    "Which is more reliable: {brand} or {competitor}?",
-    "{brand} vs {competitor} pricing comparison",
-    "{brand} vs {competitor} features comparison 2025"
+
+  // === BEST/TOP QUERIES (Natural phrasing) ===
+  bestQueries: [
+    "What's the best {industry} app?",
+    "Best {industry} company?",
+    "Top {industry} tools?",
+    "Who's the best in {industry}?",
+    "What's the leading {industry} platform?",
+    "Best {industry} software right now?",
+    "What's number one in {industry}?",
+    "Top rated {industry}?",
+    "Best {industry} for {targetAudience}?",
+    "Most popular {industry}?"
   ],
-  
-  // === ALTERNATIVES & SWITCHING ===
+
+  // === COMPARISON QUERIES (Natural) ===
+  comparison: [
+    "How does {brand} compare?",
+    "{brand} vs the competition?",
+    "Is {brand} better than {competitor}?",
+    "{brand} or {competitor}?",
+    "Compare {brand} and {competitor}",
+    "Which is better: {brand} or {competitor}?",
+    "{brand} vs {competitor} - which to choose?",
+    "How's {brand} compared to others?",
+    "Is {brand} competitive?"
+  ],
+
+  // === ALTERNATIVES QUERIES ===
   alternatives: [
-    "What are the best alternatives to {brand}?",
-    "Tools similar to {brand} for {industry}",
-    "What can I use instead of {brand}?",
-    "{brand} alternatives in 2025",
-    "Better options than {brand} for {industry}",
-    "Top {brand} competitors to consider",
-    "Cheaper alternatives to {brand}",
-    "Free alternatives to {brand}",
-    "Best {brand} replacement for {targetAudience}"
+    "Alternatives to {brand}?",
+    "What's like {brand}?",
+    "Similar to {brand}?",
+    "Apps like {brand}",
+    "What competes with {brand}?",
+    "{brand} competitors?",
+    "Other options besides {brand}?",
+    "What else is there besides {brand}?",
+    "Anything better than {brand}?"
   ],
-  
-  switching: [
-    "Should I switch from {competitor} to {brand}?",
-    "Is it worth switching to {brand}?",
-    "Switching from {competitor} to {brand}: what to know",
-    "How to migrate from {competitor} to {brand}",
-    "{brand} migration guide from {competitor}"
+
+  // === USE CASE QUERIES (Natural) ===
+  useCase: [
+    "Best app for {useCase}?",
+    "What should I use for {useCase}?",
+    "Help me with {useCase}",
+    "What's good for {useCase}?",
+    "I need something for {useCase}",
+    "Recommend something for {useCase}",
+    "Tools for {useCase}?",
+    "How do I handle {useCase}?",
+    "Best way to do {useCase}?"
   ],
-  
-  // === RECOMMENDATION QUERIES (Industry-focused, brand may or may not appear) ===
-  recommendation: [
-    "What's the best {industry} tool in 2025?",
-    "Which {industry} platform do you recommend?",
-    "Top {industry} solutions for businesses",
-    "Best {industry} software for {targetAudience}",
-    "What {industry} tool should I use?",
-    "Recommend a good {industry} platform",
-    "What's the most popular {industry} software?",
-    "Best {industry} for my needs",
-    "Which {industry} platform is easiest to use?"
+
+  // === PRICING QUERIES ===
+  pricing: [
+    "Is {brand} free?",
+    "How much is {brand}?",
+    "{brand} pricing?",
+    "Is {brand} expensive?",
+    "Does {brand} have a free plan?",
+    "What does {brand} cost?",
+    "{brand} free trial?",
+    "Cheap {industry} options?",
+    "Free {industry} tools?"
   ],
-  
+
+  // === REVIEW/RATING QUERIES ===
+  review: [
+    "{brand} reviews?",
+    "Is {brand} legit?",
+    "{brand} worth it?",
+    "Any issues with {brand}?",
+    "Problems with {brand}?",
+    "{brand} pros and cons?",
+    "Honest opinion on {brand}?",
+    "What's wrong with {brand}?",
+    "Is {brand} reliable?"
+  ],
+
+  // === AUDIENCE-SPECIFIC QUERIES ===
   audienceSpecific: [
-    "Best {industry} for startups",
-    "Best {industry} for small business",
-    "Best {industry} for enterprise companies",
-    "Best {industry} for freelancers",
-    "Best {industry} for agencies",
-    "Best {industry} for developers",
-    "Best {industry} for non-technical users",
-    "Best {industry} for beginners in 2025"
+    "Best {industry} for startups?",
+    "{industry} for small business?",
+    "Enterprise {industry} solutions?",
+    "{industry} for developers?",
+    "Easy {industry} for beginners?",
+    "{industry} for freelancers?",
+    "Simple {industry} tools?",
+    "Best {industry} for teams?"
   ],
-  
-  useCaseSpecific: [
-    "Best tool for {useCase}",
+
+  // === REGIONAL QUERIES ===
+  regional: [
+    "Best {industry} in {region}?",
+    "{industry} for {region}?",
+    "Is {brand} available in {region}?",
+    "Top {industry} companies in {region}?",
+    "{region} {industry} options?"
+  ]
+};
     "What {industry} software is best for {useCase}?",
     "Recommended platform for {useCase}",
     "Which {industry} solution handles {useCase} best?",

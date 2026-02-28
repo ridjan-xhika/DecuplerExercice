@@ -1,6 +1,7 @@
 const { Domain } = require('../models');
 const { runFullAnalysis, getExistingReport } = require('../services/analysisPipeline');
 const { getScoreHistory } = require('../services/visibilityScorer');
+const { runStreamingAnalysis } = require('../services/streamingAnalysis');
 
 // Run full analysis for a domain with enhanced options
 const analyze = async (req, res) => {
@@ -44,6 +45,54 @@ const analyze = async (req, res) => {
   } catch (error) {
     console.error('Analysis error:', error);
     res.status(500).json({ error: 'Failed to run analysis' });
+  }
+};
+
+// Streaming analysis with Server-Sent Events
+const analyzeStream = async (req, res) => {
+  const { 
+    domain, 
+    industry, 
+    targetAudience,
+    mainUseCases,
+    knownCompetitors,
+    productDescription,
+    region 
+  } = req.query;
+
+  if (!domain) {
+    return res.status(400).json({ error: 'Domain is required' });
+  }
+
+  // Set up SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.flushHeaders();
+
+  // Helper to send SSE events
+  const sendEvent = (eventType, data) => {
+    res.write(`event: ${eventType}\n`);
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+
+  try {
+    const options = {
+      industry: industry || null,
+      targetAudience: targetAudience || null,
+      mainUseCases: mainUseCases || null,
+      knownCompetitors: knownCompetitors || null,
+      productDescription: productDescription || null,
+      region: region || 'global'
+    };
+
+    await runStreamingAnalysis(domain, options, sendEvent);
+  } catch (error) {
+    console.error('Streaming analysis error:', error);
+    sendEvent('error', { message: error.message });
+  } finally {
+    res.end();
   }
 };
 
@@ -104,6 +153,7 @@ const getHistory = async (req, res) => {
 
 module.exports = {
   analyze,
+  analyzeStream,
   getReport,
   getAllDomains,
   getDomain,

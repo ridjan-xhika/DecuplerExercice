@@ -5,6 +5,9 @@ const analysisController = require('../controllers/analysisController');
 // POST /api/analysis - Run full analysis for a domain
 router.post('/', analysisController.analyze);
 
+// GET /api/analysis/stream - Streaming analysis with SSE
+router.get('/stream', analysisController.analyzeStream);
+
 // GET /api/analysis/domains - Get all analyzed domains
 router.get('/domains', analysisController.getAllDomains);
 
