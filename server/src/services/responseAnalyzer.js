@@ -327,6 +327,72 @@ async function analyzeResponse(responseId, responseText, targetBrand) {
  * @param {string} targetBrand - The brand we're tracking
  * @returns {object} Aggregated analysis
  */
+/**
+ * Extract ranking position from a ranking query response
+ * Looks for numbered lists, "first", "second", etc.
+ * @param {string} text - Response text
+ * @param {string} targetBrand - Brand to find ranking for
+ * @returns {object} { found: boolean, position: number|null, totalRanked: number }
+ */
+function extractRankingPosition(text, targetBrand) {
+  const normalizedText = text.toLowerCase();
+  const brandLower = targetBrand.toLowerCase();
+  
+  // Check if brand is mentioned at all
+  if (!normalizedText.includes(brandLower)) {
+    return { found: false, position: null, totalRanked: 0 };
+  }
+
+  // Pattern 1: Numbered lists (1. Nike, 2. Adidas, etc.)
+  const numberedPattern = /(\d+)[\.\)\:\-]\s*[*#]*\s*([^\n\-:]+)/gi;
+  const matches = [...text.matchAll(numberedPattern)];
+  
+  for (const match of matches) {
+    const position = parseInt(match[1]);
+    const content = match[2].toLowerCase();
+    if (content.includes(brandLower) && position <= 20) {
+      return { found: true, position, totalRanked: matches.length };
+    }
+  }
+
+  // Pattern 2: Bullet points with implicit order (- Nike, - Adidas)
+  const bulletPattern = /^[\*\-•]\s*[*#]*\s*([^\n]+)/gmi;
+  const bulletMatches = [...text.matchAll(bulletPattern)];
+  let bulletPosition = 1;
+  
+  for (const match of bulletMatches) {
+    const content = match[1].toLowerCase();
+    if (content.includes(brandLower)) {
+      return { found: true, position: bulletPosition, totalRanked: bulletMatches.length };
+    }
+    bulletPosition++;
+  }
+
+  // Pattern 3: Ordinal words (first, second, third...)
+  const ordinals = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth'];
+  for (let i = 0; i < ordinals.length; i++) {
+    const ordinal = ordinals[i];
+    // Check if brand is mentioned near ordinal
+    const ordinalPattern = new RegExp(`${ordinal}[^.]*${brandLower}|${brandLower}[^.]*${ordinal}`, 'i');
+    if (ordinalPattern.test(normalizedText)) {
+      return { found: true, position: i + 1, totalRanked: 10 };
+    }
+  }
+
+  // Pattern 4: "#1" or "number one" style
+  const numberOnePattern = new RegExp(`(#1|number one|top pick|best overall|winner)[^.]*${brandLower}|${brandLower}[^.]*(#1|number one|top pick|best overall|winner)`, 'i');
+  if (numberOnePattern.test(normalizedText)) {
+    return { found: true, position: 1, totalRanked: 1 };
+  }
+
+  // Brand mentioned but no clear ranking
+  return { found: true, position: null, totalRanked: 0 };
+}
+
+/**
+ * Analyze all AI responses for a domain
+ * Now includes ranking extraction
+ */
 async function analyzeAllResponses(responses, targetBrand) {
   const results = {
     totalResponses: responses.length,
@@ -335,7 +401,15 @@ async function analyzeAllResponses(responses, targetBrand) {
     top1Count: 0,
     top3Count: 0,
     competitorCounts: {},
-    analyses: []
+    analyses: [],
+    // NEW: Ranking data
+    rankings: {
+      found: false,
+      positions: [],
+      averageRank: null,
+      bestRank: null,
+      worstRank: null
+    }
   };
 
   for (const response of responses) {
@@ -355,6 +429,27 @@ async function analyzeAllResponses(responses, targetBrand) {
       results.competitorCounts[comp.competitor_name] = 
         (results.competitorCounts[comp.competitor_name] || 0) + 1;
     }
+
+    // Extract ranking if this is a ranking query
+    if (response.query_type === 'ranking') {
+      const rankingResult = extractRankingPosition(response.response_text, targetBrand);
+      if (rankingResult.found && rankingResult.position !== null) {
+        results.rankings.found = true;
+        results.rankings.positions.push({
+          position: rankingResult.position,
+          totalRanked: rankingResult.totalRanked,
+          query: response.query_text
+        });
+      }
+    }
+  }
+
+  // Calculate ranking stats
+  if (results.rankings.positions.length > 0) {
+    const positions = results.rankings.positions.map(p => p.position);
+    results.rankings.averageRank = Math.round((positions.reduce((a, b) => a + b, 0) / positions.length) * 10) / 10;
+    results.rankings.bestRank = Math.min(...positions);
+    results.rankings.worstRank = Math.max(...positions);
   }
 
   // Sort competitors by frequency
@@ -384,5 +479,6 @@ module.exports = {
   isTargetMentioned,
   detectBrandIndustry,
   getIndustryCompetitors,
+  extractRankingPosition,
   INDUSTRY_COMPETITORS
 };

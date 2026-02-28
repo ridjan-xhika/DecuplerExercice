@@ -140,6 +140,9 @@ function calculateScore(analysisResults) {
   // Calculate mention rate
   const mentionRate = totalResponses > 0 ? Math.round((responsesWithTarget / totalResponses) * 100) : 0;
 
+  // Extract ranking data if available
+  const rankings = analysisResults.rankings || { found: false, positions: [], averageRank: null, bestRank: null };
+
   return {
     score: Math.round(finalScore * 100) / 100,
     rawScore: Math.round(rawScore * 100) / 100,
@@ -159,6 +162,13 @@ function calculateScore(analysisResults) {
       top3Count,
       avgPosition: avgPosition ? Math.round(avgPosition * 100) / 100 : null,
       mentionRate,
+      // NEW: Ranking data
+      ranking: rankings.found ? {
+        averageRank: rankings.averageRank,
+        bestRank: rankings.bestRank,
+        worstRank: rankings.worstRank,
+        timesRanked: rankings.positions.length
+      } : null,
       note: 'Score based on mention frequency, position, and competitor comparison'
     }
   };

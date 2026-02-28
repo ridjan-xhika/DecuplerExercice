@@ -451,55 +451,51 @@ function generateEnhancedQueries(brand, analysis, options = {}) {
     }
   };
 
-  // ============ HIGH PRIORITY: DIRECT BRAND QUERIES ============
-  // These queries DIRECTLY ask about the brand - should guarantee mentions
+  // ============ BRAND QUERIES (mention the brand) ============
+  // These test: Does the AI know about this brand?
   
-  // 1. DIRECT BRAND QUERIES - "What is {brand}?" type queries (5-6 queries)
-  addQueries(QUERY_TEMPLATES.directBrand, 'directBrand', 6);
+  // 1. DIRECT BRAND QUERIES - "What is {brand}?" (4 queries)
+  addQueries(QUERY_TEMPLATES.directBrand, 'directBrand', 4);
   
-  // 2. BRAND OPINION QUERIES - "Should I use {brand}?" type queries (4-5 queries)
-  addQueries(QUERY_TEMPLATES.brandOpinion, 'brandOpinion', 5);
+  // 2. BRAND OPINION QUERIES - "How do you rate {brand}?" (3 queries)
+  addQueries(QUERY_TEMPLATES.brandOpinion, 'brandOpinion', 3);
 
-  // ============ MEDIUM PRIORITY: COMPARATIVE & DISCOVERY QUERIES ============
-
-  // 3. DIRECT COMPETITOR COMPARISONS (up to 6 queries)
+  // 3. COMPETITOR COMPARISONS - "{brand} vs {competitor}?" (up to 4 queries)
   if (topCompetitors.length > 0) {
-    const competitorsToCompare = topCompetitors.slice(0, 3);
+    const competitorsToCompare = topCompetitors.slice(0, 2);
     for (const competitor of competitorsToCompare) {
       addQueries(QUERY_TEMPLATES.comparison, 'comparison', 2, { competitor });
     }
   }
 
-  // 4. ALTERNATIVES QUERIES (3 queries)
-  addQueries(QUERY_TEMPLATES.alternatives, 'alternatives', 3);
+  // ============ DISCOVERY QUERIES (NO brand mentioned) ============
+  // These test: Does the AI naturally recommend this brand?
+  // This is the TRUE test of AI visibility
 
-  // 5. REVIEW QUERIES (3 queries)
-  addQueries(QUERY_TEMPLATES.review, 'review', 3);
+  // 4. RANKING QUERIES (CRITICAL) - "Rank the top 10 companies" (4 queries)
+  addQueries(QUERY_TEMPLATES.ranking, 'ranking', 4);
 
-  // 6. PRICING QUERIES (2 queries)
-  addQueries(QUERY_TEMPLATES.pricing, 'pricing', 2);
-
-  // ============ PRODUCT-SPECIFIC DISCOVERY QUERIES ============
-  // These ask about what users actually DO, not generic "software" questions
-
-  // 7. PRODUCT DISCOVERY (6 queries) - "Where can I stream music?", "Best running shoes?"
+  // 5. PRODUCT DISCOVERY - "Where can I stream music?" (6 queries)
   addQueries(QUERY_TEMPLATES.productDiscovery, 'productDiscovery', 6);
 
-  // 8. BEST QUERIES (5 queries) - "What's the best music streaming app?", "Best place to buy sneakers?"
-  addQueries(QUERY_TEMPLATES.bestQueries, 'bestQueries', 5);
+  // 6. BEST QUERIES - "What's the best music streaming app?" (6 queries)
+  addQueries(QUERY_TEMPLATES.bestQueries, 'bestQueries', 6);
 
-  // 9. USE CASE QUERIES (up to 3 queries)
+  // 7. USE CASE QUERIES (up to 4 queries)
   if (useCases.length > 0) {
-    const useCasesToQuery = useCases.slice(0, 3);
+    const useCasesToQuery = useCases.slice(0, 4);
     for (const useCase of useCasesToQuery) {
       addQueries(QUERY_TEMPLATES.useCase, 'useCase', 1, { useCase });
     }
   }
 
-  // 10. AUDIENCE-SPECIFIC QUERIES (2 queries)
-  addQueries(QUERY_TEMPLATES.audienceSpecific, 'audienceSpecific', 2);
+  // 8. AUDIENCE-SPECIFIC QUERIES (3 queries)
+  addQueries(QUERY_TEMPLATES.audienceSpecific, 'audienceSpecific', 3);
 
-  // 11. REGIONAL QUERIES (if region provided)
+  // 9. PRICING QUERIES - free/affordable options (2 queries)
+  addQueries(QUERY_TEMPLATES.pricing, 'pricing', 2);
+
+  // 10. REGIONAL QUERIES (if region provided)
   if (region && region !== 'global') {
     addQueries(QUERY_TEMPLATES.regional, 'regional', 2, { region });
   }
