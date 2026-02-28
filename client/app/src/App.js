@@ -80,7 +80,10 @@ function App() {
 
             <div className="card full-width">
               <h2 className="card-title">Recommendations</h2>
-              <RecommendationList recommendations={report.recommendations} />
+              <RecommendationList 
+                recommendations={report.recommendations} 
+                aiRecommendations={report.aiRecommendations}
+              />
             </div>
           </div>
         )}
