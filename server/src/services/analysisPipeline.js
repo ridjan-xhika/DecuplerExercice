@@ -4,7 +4,7 @@
  */
 
 const { Domain } = require('../models');
-const { generateQueries, inferIndustry } = require('./queryGenerator');
+const { generateQueriesWithAI, generateQueries, inferIndustry, analyzeCompanyWithAI } = require('./queryGenerator');
 const { Prompt } = require('../models');
 const { processDomainsPrompts, getResponsesForDomain } = require('./aiResponseService');
 const { analyzeAllResponses } = require('./responseAnalyzer');
@@ -19,11 +19,12 @@ const { Competitor } = require('../models');
  * @returns {object} Complete analysis report
  */
 async function runFullAnalysis(domainName, options = {}) {
-  const { industry, queryOptions = {} } = options;
+  const { industry, queryOptions = {}, useAIQueries = true } = options;
 
   const report = {
     domain: null,
-    queries: { count: 0, generated: [] },
+    companyAnalysis: null, // AI-detected industry, competitors, etc.
+    queries: { count: 0, generated: [], aiEnhanced: false },
     aiResponses: { count: 0, successful: 0, failed: 0 },
     analysis: null,
     score: null,
@@ -40,8 +41,33 @@ async function runFullAnalysis(domainName, options = {}) {
     const domain = await Domain.findOrCreate(domainName, resolvedIndustry);
     report.domain = domain;
 
-    // Step 2: Generate queries
-    const queries = generateQueries(domainName, resolvedIndustry, queryOptions);
+    // Step 2: Analyze company with AI to get industry, competitors, use cases
+    let queries;
+    let companyAnalysis = null;
+    
+    if (useAIQueries) {
+      console.log(`Running AI company analysis for ${domainName}...`);
+      companyAnalysis = await analyzeCompanyWithAI(domainName);
+      report.companyAnalysis = companyAnalysis;
+      
+      if (companyAnalysis) {
+        console.log(`AI detected industry: ${companyAnalysis.industry}`);
+        console.log(`AI detected competitors: ${companyAnalysis.topCompetitors?.join(', ')}`);
+        
+        // Update domain industry if AI detected one
+        if (companyAnalysis.industry && companyAnalysis.industry !== resolvedIndustry) {
+          await Domain.update(domain.id, { industry: companyAnalysis.industry });
+          domain.industry = companyAnalysis.industry;
+        }
+      }
+      
+      // Generate queries using AI analysis
+      queries = await generateQueriesWithAI(domainName, resolvedIndustry, queryOptions);
+      report.queries.aiEnhanced = true;
+    } else {
+      queries = generateQueries(domainName, resolvedIndustry, queryOptions);
+      report.queries.aiEnhanced = false;
+    }
     
     // Save queries to database
     for (const query of queries) {

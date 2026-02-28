@@ -1,10 +1,10 @@
 const { Domain, Prompt } = require('../models');
-const { generateQueries, inferIndustry } = require('../services/queryGenerator');
+const { generateQueries, generateQueriesWithAI, inferIndustry } = require('../services/queryGenerator');
 
-// Generate queries for a domain
+// Generate queries for a domain (with AI-powered industry detection)
 const generateDomainQueries = async (req, res) => {
   try {
-    const { domain, industry, options } = req.body;
+    const { domain, industry, options, useAI = true } = req.body;
 
     if (!domain) {
       return res.status(400).json({ error: 'Domain is required' });
@@ -16,8 +16,13 @@ const generateDomainQueries = async (req, res) => {
     // Find or create the domain
     const domainRecord = await Domain.findOrCreate(domain, resolvedIndustry);
 
-    // Generate queries
-    const queries = generateQueries(domain, resolvedIndustry, options || {});
+    // Generate queries (AI-enhanced or basic)
+    let queries;
+    if (useAI) {
+      queries = await generateQueriesWithAI(domain, resolvedIndustry, options || {});
+    } else {
+      queries = generateQueries(domain, resolvedIndustry, options || {});
+    }
 
     // Save queries to database
     const savedQueries = [];
@@ -29,7 +34,8 @@ const generateDomainQueries = async (req, res) => {
     res.status(201).json({
       domain: domainRecord,
       queries: savedQueries,
-      count: savedQueries.length
+      count: savedQueries.length,
+      aiEnhanced: useAI
     });
   } catch (error) {
     console.error('Error generating queries:', error);
@@ -55,23 +61,30 @@ const getQueriesByDomain = async (req, res) => {
   }
 };
 
-// Preview queries (without saving)
+// Preview queries (without saving) - with AI support
 const previewQueries = async (req, res) => {
   try {
-    const { domain, industry, options } = req.body;
+    const { domain, industry, options, useAI = true } = req.body;
 
     if (!domain) {
       return res.status(400).json({ error: 'Domain is required' });
     }
 
     const resolvedIndustry = industry || inferIndustry(domain);
-    const queries = generateQueries(domain, resolvedIndustry, options || {});
+    
+    let queries;
+    if (useAI) {
+      queries = await generateQueriesWithAI(domain, resolvedIndustry, options || {});
+    } else {
+      queries = generateQueries(domain, resolvedIndustry, options || {});
+    }
 
     res.json({
       domain,
       industry: resolvedIndustry,
       queries,
-      count: queries.length
+      count: queries.length,
+      aiEnhanced: useAI
     });
   } catch (error) {
     console.error('Error previewing queries:', error);
