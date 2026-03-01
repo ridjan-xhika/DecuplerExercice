@@ -7,7 +7,7 @@ const { Domain } = require('../models');
 const { generateQueriesWithAI, generateQueries, inferIndustry, analyzeCompanyWithAI } = require('./queryGenerator');
 const { Prompt } = require('../models');
 const { processDomainsPrompts, getResponsesForDomain } = require('./aiResponseService');
-const { analyzeAllResponses } = require('./responseAnalyzer');
+const { analyzeAllResponses, analyzeMentionSentiment, aggregateSentiment } = require('./responseAnalyzer');
 const { calculateAndSaveScore, getScoreTrend, interpretScore } = require('./visibilityScorer');
 const { generateAndSaveRecommendations } = require('./recommendationEngine');
 const { Competitor } = require('../models');
@@ -130,6 +130,12 @@ async function runFullAnalysis(domainName, options = {}) {
       top3Count: 0,
       analyses: []
     };
+    
+    // Perform sentiment analysis
+    const sentimentResults = responses.map(r => analyzeMentionSentiment(r.response_text, domainName));
+    const sentiment = aggregateSentiment(sentimentResults);
+    analysisResults.sentiment = sentiment;
+    
     report.analysis = {
       totalResponses: analysisResults.totalResponses || 0,
       responsesWithTarget: analysisResults.responsesWithTarget || 0,

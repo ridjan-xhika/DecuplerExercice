@@ -4,11 +4,11 @@
  */
 
 const { Domain } = require('../models');
-const { generateQueriesWithAI, generateQueries, inferIndustry, analyzeCompanyWithAI } = require('./queryGenerator');
+const { generateQueriesWithAI, generateQueries, inferIndustry, analyzeCompanyWithAI, detectInputType } = require('./queryGenerator');
 const { Prompt } = require('../models');
 const { askAllProviders } = require('./aiClient');
 const { AIResponse } = require('../models');
-const { analyzeAllResponses } = require('./responseAnalyzer');
+const { analyzeAllResponses, analyzeMentionSentiment, aggregateSentiment } = require('./responseAnalyzer');
 const { calculateAndSaveScore, getScoreTrend, interpretScore } = require('./visibilityScorer');
 const { generateAndSaveRecommendations } = require('./recommendationEngine');
 const { Competitor } = require('../models');
@@ -42,6 +42,11 @@ async function runStreamingAnalysis(domainName, options, sendEvent) {
     topCompetitors: [],
     timestamp: new Date().toISOString()
   };
+
+  // Detect input type early - needed for mention checks throughout
+  const inputInfo = detectInputType(domainName);
+  const brandNameToCheck = inputInfo.cleanName; // Clean brand name (e.g., "Starbucks" from "starbucks.com")
+  const domainToCheck = inputInfo.domain; // Domain if applicable (e.g., "starbucks.com")
 
   try {
     // Step 1: Create or find domain
@@ -151,7 +156,10 @@ async function runStreamingAnalysis(domainName, options, sendEvent) {
 
             // Send the response preview
             const preview = result.responseText.substring(0, 300) + (result.responseText.length > 300 ? '...' : '');
-            const mentioned = result.responseText.toLowerCase().includes(domainName.toLowerCase());
+            // Check for BOTH brand name AND domain - either counts as mentioned
+            const responseLower = result.responseText.toLowerCase();
+            const mentioned = responseLower.includes(brandNameToCheck.toLowerCase()) || 
+                              (domainToCheck && responseLower.includes(domainToCheck.toLowerCase()));
             
             sendEvent('response', {
               index: i + 1,
@@ -196,10 +204,16 @@ async function runStreamingAnalysis(domainName, options, sendEvent) {
 
     // Step 5: Analyze responses
     sendEvent('status', { phase: 'scoring', message: 'Analyzing responses and calculating score...' });
+    
+    // Use the inputInfo detected at the start
+    const analysisOptions = {
+      domainToCheck: inputInfo.domain,
+      isWebsite: inputInfo.isDomain || inputInfo.inputType === 'online_brand'
+    };
 
     const { getResponsesForDomain } = require('./aiResponseService');
     const responses = await getResponsesForDomain(domain.id);
-    const analysisResults = await analyzeAllResponses(responses, domainName) || {
+    const analysisResults = await analyzeAllResponses(responses, inputInfo.cleanName, analysisOptions) || {
       totalResponses: 0,
       responsesWithTarget: 0,
       totalMentions: 0,
@@ -208,12 +222,18 @@ async function runStreamingAnalysis(domainName, options, sendEvent) {
       analyses: []
     };
     
+    // Perform sentiment analysis on all responses - use clean brand name
+    const sentimentResults = responses.map(r => analyzeMentionSentiment(r.response_text, brandNameToCheck));
+    const sentiment = aggregateSentiment(sentimentResults);
+    analysisResults.sentiment = sentiment;
+    
     report.analysis = {
       totalResponses: analysisResults.totalResponses || 0,
       responsesWithTarget: analysisResults.responsesWithTarget || 0,
       totalMentions: analysisResults.totalMentions || 0,
       top1Count: analysisResults.top1Count || 0,
-      top3Count: analysisResults.top3Count || 0
+      top3Count: analysisResults.top3Count || 0,
+      sentiment
     };
 
     // Step 6: Calculate score
