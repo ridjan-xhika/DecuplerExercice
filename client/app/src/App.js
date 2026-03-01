@@ -7,6 +7,10 @@ import CompetitorList from './components/CompetitorList';
 import RecommendationList from './components/RecommendationList';
 import ScoreChart from './components/ScoreChart';
 import LiveFeed from './components/LiveFeed';
+import ExportButton from './components/ExportButton';
+import QueryBreakdown from './components/QueryBreakdown';
+import SentimentIndicator from './components/SentimentIndicator';
+import TrendPrediction from './components/TrendPrediction';
 
 function App() {
   const [loading, setLoading] = useState(false);
@@ -132,6 +136,16 @@ function App() {
 
         {!loading && report && (
           <div className="dashboard-grid">
+            <div className="card report-header-card">
+              <div className="report-header-content">
+                <div className="report-brand">
+                  <h2>{report.domain?.name}</h2>
+                  <span className="industry-badge">{report.domain?.industry || 'Unknown Industry'}</span>
+                </div>
+                <ExportButton report={report} />
+              </div>
+            </div>
+
             <div className="card">
               <ScoreDisplay 
                 score={report.score?.score} 
@@ -146,6 +160,11 @@ function App() {
             </div>
 
             <div className="card">
+              <h2 className="card-title">Sentiment Analysis</h2>
+              <SentimentIndicator sentiment={report.score?.sentiment} />
+            </div>
+
+            <div className="card">
               <h2 className="card-title">Top Competitors</h2>
               <CompetitorList competitors={report.topCompetitors} />
             </div>
@@ -153,6 +172,11 @@ function App() {
             <div className="card">
               <h2 className="card-title">Score History</h2>
               <ScoreChart domainId={report.domain?.id} />
+              <TrendPrediction trend={report.trend} currentScore={report.score?.score} />
+            </div>
+
+            <div className="card full-width">
+              <QueryBreakdown queries={report.queries?.generated} />
             </div>
 
             <div className="card full-width">
