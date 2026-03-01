@@ -728,12 +728,28 @@ async function analyzeAllResponses(responses, targetBrand, options = {}) {
   }
 
   // Sort competitors by frequency - merge AI-identified with dynamic extraction
-  // AI-identified competitors get priority placement
-  const competitorList = Object.entries(results.competitorCounts)
-    .sort((a, b) => b[1] - a[1])
+  // First, normalize competitor counts (merge different casings)
+  const normalizedCounts = new Map();
+  for (const [name, count] of Object.entries(results.competitorCounts)) {
+    const lowerName = name.toLowerCase();
+    if (normalizedCounts.has(lowerName)) {
+      const existing = normalizedCounts.get(lowerName);
+      existing.count += count;
+      // Keep the properly capitalized version (most likely the longer one or first seen)
+      if (name.length > existing.name.length || (name[0] === name[0].toUpperCase() && existing.name[0] !== existing.name[0].toUpperCase())) {
+        existing.name = name;
+      }
+    } else {
+      normalizedCounts.set(lowerName, { name, count });
+    }
+  }
+  
+  // Convert back to sorted list
+  const competitorList = Array.from(normalizedCounts.values())
+    .sort((a, b) => b.count - a.count)
     .slice(0, 15);
   
-  results.topCompetitors = competitorList.map(([name, count]) => {
+  results.topCompetitors = competitorList.map(({ name, count }) => {
     // Check if this was directly identified by AI
     const aiIdentified = results.aiIdentifiedCompetitors.find(c => c.name.toLowerCase() === name.toLowerCase());
     return {
@@ -790,8 +806,9 @@ function extractBrandsFromResponse(text, targetBrand) {
   // Pattern 3: Common brand indicators
   const brandIndicatorPattern = /(?:brands?|companies?|competitors?|alternatives?|options?)(?:[^:]*?:)?\s*([A-Z][^.\n]{10,100})/gi;
   
-  // Words to exclude (common words that aren't brands)
+  // Words to exclude (common words that aren't brands) - COMPREHENSIVE LIST
   const excludeWords = new Set([
+    // Common English words
     'the', 'and', 'for', 'with', 'that', 'this', 'from', 'are', 'was', 'were', 'been',
     'have', 'has', 'had', 'will', 'would', 'could', 'should', 'may', 'might', 'must',
     'best', 'top', 'great', 'good', 'better', 'first', 'second', 'third', 'new', 'old',
@@ -802,17 +819,91 @@ function extractBrandsFromResponse(text, targetBrand) {
     'however', 'therefore', 'furthermore', 'moreover', 'although', 'because', 'since',
     'while', 'whereas', 'unless', 'until', 'after', 'before', 'during', 'through',
     'above', 'below', 'between', 'among', 'within', 'without', 'against', 'toward',
+    // Business/marketing terms (NOT brands)
     'key', 'main', 'major', 'primary', 'secondary', 'core', 'central', 'essential',
     'important', 'significant', 'notable', 'leading', 'popular', 'famous', 'known',
     'overall', 'general', 'specific', 'particular', 'certain', 'various', 'different',
     'similar', 'same', 'like', 'such', 'these', 'those', 'another', 'others',
     'user', 'users', 'customer', 'customers', 'people', 'team', 'teams', 'company', 'companies',
     'product', 'products', 'service', 'services', 'platform', 'platforms', 'app', 'apps',
-    'market', 'industry', 'sector', 'space', 'area', 'field', 'domain', 'niche',
-    'price', 'pricing', 'cost', 'value', 'quality', 'features', 'feature', 'option', 'options',
+    'market', 'markets', 'industry', 'industries', 'sector', 'sectors', 'space', 'area', 'field', 'domain', 'niche',
+    'price', 'pricing', 'cost', 'costs', 'value', 'quality', 'features', 'feature', 'option', 'options',
     'conclusion', 'summary', 'introduction', 'overview', 'comparison', 'review', 'reviews',
-    'pros', 'cons', 'advantages', 'disadvantages', 'benefits', 'drawbacks', 'strengths', 'weaknesses'
+    'pros', 'cons', 'advantages', 'disadvantages', 'benefits', 'drawbacks', 'strengths', 'weaknesses',
+    // Common false positives from AI responses
+    'your', 'you', 'they', 'their', 'them', 'its', 'our', 'we', 'us', 'my', 'me', 'i',
+    'market share', 'product offerings', 'offerings', 'offering', 'share',
+    'brand', 'brands', 'branding', 'branded',
+    'competitor', 'competitors', 'competitive', 'competition',
+    'alternative', 'alternatives',
+    'analysis', 'report', 'data', 'information', 'details', 'insight', 'insights',
+    'ranking', 'rankings', 'rank', 'ranked', 'position', 'positions',
+    'category', 'categories', 'segment', 'segments', 'type', 'types',
+    'performance', 'growth', 'revenue', 'sales', 'profit', 'profits',
+    'strategy', 'strategies', 'approach', 'approaches', 'method', 'methods',
+    'customer experience', 'user experience', 'experience', 'experiences',
+    'innovation', 'innovations', 'technology', 'technologies', 'tech',
+    'design', 'designs', 'style', 'styles', 'fashion',
+    'retail', 'retailer', 'retailers', 'store', 'stores', 'shop', 'shops',
+    'online', 'offline', 'digital', 'physical', 'virtual',
+    'global', 'local', 'regional', 'national', 'international', 'worldwide',
+    'premium', 'luxury', 'budget', 'affordable', 'expensive', 'cheap',
+    'high', 'low', 'medium', 'average', 'standard', 'basic', 'advanced',
+    'large', 'small', 'big', 'little', 'huge', 'tiny', 'massive',
+    'strong', 'weak', 'powerful', 'limited', 'extensive', 'comprehensive',
+    'modern', 'traditional', 'classic', 'contemporary', 'current', 'recent',
+    'direct', 'indirect', 'primary', 'secondary', 'main', 'minor',
+    'fast', 'slow', 'quick', 'rapid', 'gradual', 'steady',
+    'free', 'paid', 'subscription', 'freemium', 'enterprise',
+    'note', 'notes', 'tip', 'tips', 'hint', 'hints', 'warning', 'caution',
+    'example', 'examples', 'instance', 'instances', 'case', 'cases',
+    'step', 'steps', 'process', 'processes', 'procedure', 'procedures',
+    'result', 'results', 'outcome', 'outcomes', 'effect', 'effects',
+    'reason', 'reasons', 'cause', 'causes', 'factor', 'factors',
+    'way', 'ways', 'manner', 'means', 'method', 'technique', 'techniques',
+    'point', 'points', 'aspect', 'aspects', 'element', 'elements',
+    'part', 'parts', 'section', 'sections', 'portion', 'portions',
+    'time', 'times', 'period', 'periods', 'year', 'years', 'month', 'months', 'day', 'days',
+    'number', 'numbers', 'amount', 'amounts', 'quantity', 'quantities',
+    'level', 'levels', 'degree', 'degrees', 'extent', 'range', 'ranges',
+    'source', 'sources', 'origin', 'origins', 'base', 'bases', 'foundation',
+    'focus', 'focuses', 'emphasis', 'priority', 'priorities',
+    'goal', 'goals', 'objective', 'objectives', 'target', 'targets', 'aim', 'aims',
+    'issue', 'issues', 'problem', 'problems', 'challenge', 'challenges', 'concern', 'concerns',
+    'solution', 'solutions', 'answer', 'answers', 'response', 'responses',
+    'question', 'questions', 'query', 'queries', 'request', 'requests',
+    'choice', 'choices', 'selection', 'selections', 'pick', 'picks',
+    'list', 'lists', 'item', 'items', 'entry', 'entries',
+    'name', 'names', 'title', 'titles', 'label', 'labels',
+    'description', 'descriptions', 'definition', 'definitions', 'explanation', 'explanations',
+    'image', 'images', 'picture', 'pictures', 'photo', 'photos', 'video', 'videos',
+    'link', 'links', 'url', 'urls', 'website', 'websites', 'site', 'sites', 'page', 'pages',
+    'content', 'contents', 'material', 'materials', 'resource', 'resources',
+    'tool', 'tools', 'software', 'application', 'applications',
+    // Common sentence starters that get picked up
+    'here', 'below', 'following', 'above', 'next', 'finally', 'lastly', 'additionally',
+    'however', 'moreover', 'furthermore', 'therefore', 'thus', 'hence', 'consequently',
+    'overall', 'generally', 'typically', 'usually', 'often', 'sometimes', 'rarely', 'never',
+    // Possessives and pronouns
+    "it's", "that's", "what's", "here's", "there's", "who's", "how's", "why's",
+    "don't", "doesn't", "didn't", "won't", "wouldn't", "can't", "couldn't", "shouldn't",
+    // Numbers written as words
+    'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'
   ]);
+  
+  // Additional patterns to skip (regex-based)
+  const skipPatterns = [
+    /^[A-Z]$/,                           // Single capital letters
+    /^\d+$/,                              // Pure numbers
+    /^[A-Z][a-z]$/,                       // Two-letter words
+    /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i,  // Months
+    /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)/i,   // Days
+    /^(Product|Market|Brand|Customer|Service|Quality|Price)/i, // Business terms
+    /Share$/i,                            // "Market Share", etc.
+    /Offerings?$/i,                       // "Product Offerings"
+    /Experience$/i,                       // "Customer Experience"
+    /Analysis$/i,                         // "Market Analysis"
+  ];
   
   // Extract from capitalized patterns
   let match;
@@ -825,8 +916,9 @@ function extractBrandsFromResponse(text, targetBrand) {
         candidateLower.includes(targetLower) || 
         targetLower.includes(candidateLower) ||
         excludeWords.has(candidateLower) ||
-        candidate.length < 2 ||
-        candidate.length > 50) {
+        candidate.length < 3 ||  // Increased minimum length
+        candidate.length > 40 ||
+        skipPatterns.some(p => p.test(candidate))) {
       continue;
     }
     
@@ -852,7 +944,8 @@ function extractBrandsFromResponse(text, targetBrand) {
       
       if (candidateLower !== targetLower && 
           !excludeWords.has(candidateLower) &&
-          candidate.length >= 2) {
+          candidate.length >= 3 &&
+          !skipPatterns.some(p => p.test(candidate))) {
         if (!brandCandidates.has(candidateLower)) {
           brandCandidates.set(candidateLower, {
             name: candidate,
