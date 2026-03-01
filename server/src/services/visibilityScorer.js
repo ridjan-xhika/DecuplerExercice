@@ -143,9 +143,13 @@ function calculateScore(analysisResults) {
   // Extract ranking data if available
   const rankings = analysisResults.rankings || { found: false, positions: [], averageRank: null, bestRank: null };
   
-  // Extract brand vs discovery query stats
+  // Extract brand vs discovery vs website query stats
   const brandQueries = analysisResults.brandQueries || { total: 0, mentioned: 0, mentionRate: 0 };
   const discoveryQueries = analysisResults.discoveryQueries || { total: 0, mentioned: 0, mentionRate: 0 };
+  const websiteQueries = analysisResults.websiteQueries || { total: 0, mentioned: 0, mentionRate: 0, domainMentions: 0 };
+  
+  // Extract sentiment data if available
+  const sentiment = analysisResults.sentiment || { positive: 0, neutral: 0, negative: 0, overall: 'neutral' };
 
   return {
     score: Math.round(finalScore * 100) / 100,
@@ -166,7 +170,7 @@ function calculateScore(analysisResults) {
       top3Count,
       avgPosition: avgPosition ? Math.round(avgPosition * 100) / 100 : null,
       mentionRate,
-      // Brand vs Discovery query stats
+      // Brand vs Discovery vs Website query stats
       brandQueries: {
         total: brandQueries.total,
         mentioned: brandQueries.mentioned,
@@ -179,6 +183,13 @@ function calculateScore(analysisResults) {
         top1Count: discoveryQueries.top1Count || 0,
         top3Count: discoveryQueries.top3Count || 0
       },
+      // Website-specific queries (for domain inputs)
+      websiteQueries: {
+        total: websiteQueries.total,
+        mentioned: websiteQueries.mentioned,
+        mentionRate: websiteQueries.mentionRate,
+        domainMentions: websiteQueries.domainMentions || 0
+      },
       // Ranking data
       ranking: rankings.found ? {
         averageRank: rankings.averageRank,
@@ -187,7 +198,9 @@ function calculateScore(analysisResults) {
         timesRanked: rankings.positions.length
       } : null,
       note: 'Score based on mention frequency, position, and competitor comparison'
-    }
+    },
+    // Sentiment data for UI
+    sentiment
   };
 }
 

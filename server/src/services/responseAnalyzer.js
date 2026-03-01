@@ -338,9 +338,10 @@ function getIndustryCompetitors(brandName) {
  * Find all brand mentions in text (industry-aware)
  * @param {string} text - The response text to analyze
  * @param {string} targetBrand - The brand we're tracking
+ * @param {object} options - Additional options like domainToCheck
  * @returns {Array} Array of mentions with positions
  */
-function findBrandMentions(text, targetBrand) {
+function findBrandMentions(text, targetBrand, options = {}) {
   const normalizedText = text.toLowerCase();
   const mentions = [];
   let position = 1;
@@ -350,6 +351,13 @@ function findBrandMentions(text, targetBrand) {
   
   // Combine target brand with its ACTUAL industry competitors
   const brandsToFind = [...new Set([targetBrand.toLowerCase(), ...industryCompetitors])];
+  
+  // If this is a website/domain input, also check for the domain itself
+  // e.g., "shopify.com" should match both "shopify" and "shopify.com"
+  const { domainToCheck } = options;
+  if (domainToCheck && !brandsToFind.includes(domainToCheck.toLowerCase())) {
+    brandsToFind.unshift(domainToCheck.toLowerCase()); // Add domain first (priority)
+  }
 
   // Find all brand occurrences with their character positions
   const brandPositions = [];
@@ -361,14 +369,28 @@ function findBrandMentions(text, targetBrand) {
       if (index === -1) break;
       
       // Check if it's a word boundary (not part of another word)
+      // Must handle: markdown (**brand**), lists (- brand), newlines, etc.
       const before = index > 0 ? normalizedText[index - 1] : ' ';
       const after = normalizedText[index + brand.length] || ' ';
       
-      if (/[\s,.\-:;!?()"']/.test(before) && /[\s,.\-:;!?()"']/.test(after)) {
+      const isDomain = brand.includes('.');
+      // Include: whitespace, punctuation, markdown chars (*, #, [, ], >, |), newlines
+      const wordBoundaryRegex = /[\s,.\-:;!?()"'*#\[\]>|\\\/\n\r\t]/;
+      const beforeOk = wordBoundaryRegex.test(before);
+      const afterOk = isDomain 
+        ? /[\s,\-:;!?()"'*#\[\]>|\n\r\t]/.test(after) // Domain: no period after
+        : wordBoundaryRegex.test(after); // Brand: period OK after
+      
+      if (beforeOk && afterOk) {
+        // Check if this is the target brand or its domain
+        const isTarget = brand === targetBrand.toLowerCase() || 
+                        (domainToCheck && brand === domainToCheck.toLowerCase());
+        
         brandPositions.push({
           brand,
           charIndex: index,
-          isTargetBrand: brand === targetBrand.toLowerCase()
+          isTargetBrand: isTarget,
+          isDomainMention: isDomain
         });
       }
       searchPos = index + 1;
@@ -381,8 +403,11 @@ function findBrandMentions(text, targetBrand) {
   // Remove duplicates and assign positions
   const seenBrands = new Set();
   for (const bp of brandPositions) {
-    if (!seenBrands.has(bp.brand)) {
-      seenBrands.add(bp.brand);
+    // For domains, treat "shopify" and "shopify.com" as the same
+    const brandKey = bp.brand.split('.')[0]; // Base name without extension
+    
+    if (!seenBrands.has(brandKey)) {
+      seenBrands.add(brandKey);
       
       // Extract context snippet (50 chars before and after)
       const snippetStart = Math.max(0, bp.charIndex - 50);
@@ -393,6 +418,7 @@ function findBrandMentions(text, targetBrand) {
         brandName: bp.brand,
         position,
         isTargetBrand: bp.isTargetBrand,
+        isDomainMention: bp.isDomainMention || false,
         contextSnippet,
         charIndex: bp.charIndex
       });
@@ -408,10 +434,11 @@ function findBrandMentions(text, targetBrand) {
  * @param {number} responseId - The AI response ID
  * @param {string} responseText - The response text
  * @param {string} targetBrand - The brand we're tracking
+ * @param {object} options - Additional options like domainToCheck
  * @returns {object} Analysis results
  */
-async function analyzeResponse(responseId, responseText, targetBrand) {
-  const mentions = findBrandMentions(responseText, targetBrand);
+async function analyzeResponse(responseId, responseText, targetBrand, options = {}) {
+  const mentions = findBrandMentions(responseText, targetBrand, options);
   
   const targetMention = mentions.find(m => m.isTargetBrand);
   const competitors = mentions.filter(m => !m.isTargetBrand);
@@ -523,12 +550,15 @@ function extractRankingPosition(text, targetBrand) {
  * Analyze all AI responses for a domain
  * Now includes ranking extraction, separate stats for brand vs discovery queries,
  * and DYNAMIC competitor detection from AI responses
+ * @param {object} options - Additional options like domainToCheck for website inputs
  */
-async function analyzeAllResponses(responses, targetBrand) {
+async function analyzeAllResponses(responses, targetBrand, options = {}) {
   // Brand query types - these mention the brand directly
   const brandQueryTypes = ['directBrand', 'brandOpinion', 'comparison', 'competitorDiscovery'];
   // Discovery query types - these DON'T mention the brand
   const discoveryQueryTypes = ['productDiscovery', 'bestQueries', 'ranking', 'useCase', 'audienceSpecific', 'pricing', 'regional'];
+  // Website-specific query types
+  const websiteQueryTypes = ['websiteDiscovery', 'websiteBest', 'websiteRanking', 'websiteUseCase', 'websiteAlternatives'];
 
   const results = {
     totalResponses: responses.length,
@@ -554,6 +584,14 @@ async function analyzeAllResponses(responses, targetBrand) {
       top3Count: 0
     },
     
+    // Website-specific queries (for domain inputs)
+    websiteQueries: {
+      total: 0,
+      mentioned: 0,
+      mentionRate: 0,
+      domainMentions: 0 // Times the actual domain (e.g., shopify.com) was mentioned
+    },
+    
     // Ranking data
     rankings: {
       found: false,
@@ -565,20 +603,53 @@ async function analyzeAllResponses(responses, targetBrand) {
   };
 
   for (const response of responses) {
-    const analysis = await analyzeResponse(response.id, response.response_text, targetBrand);
+    // Pass domain info to analysis if available
+    const analysisOptions = { ...options };
+    if (response.metadata?.domainToCheck) {
+      analysisOptions.domainToCheck = response.metadata.domainToCheck;
+    }
+    
+    const analysis = await analyzeResponse(response.id, response.response_text, targetBrand, analysisOptions);
     results.analyses.push(analysis);
 
     const queryType = response.query_type || 'unknown';
     const isBrandQuery = brandQueryTypes.includes(queryType);
     const isDiscoveryQuery = discoveryQueryTypes.includes(queryType);
+    const isWebsiteQuery = websiteQueryTypes.includes(queryType);
 
-    // Track brand vs discovery queries separately
+    // Track brand vs discovery vs website queries separately
     if (isBrandQuery) {
       results.brandQueries.total++;
       if (analysis.targetBrand.mentioned) {
         results.brandQueries.mentioned++;
       }
+    } else if (isWebsiteQuery) {
+      results.websiteQueries.total++;
+      if (analysis.targetBrand.mentioned) {
+        results.websiteQueries.mentioned++;
+        // Track position for website queries too
+        if (analysis.targetBrand.position === 1) {
+          results.websiteQueries.top1Count = (results.websiteQueries.top1Count || 0) + 1;
+        }
+        if (analysis.targetBrand.position <= 3) {
+          results.websiteQueries.top3Count = (results.websiteQueries.top3Count || 0) + 1;
+        }
+        // Check if domain specifically was mentioned
+        const domainMention = analysis.mentions?.find(m => m.isDomainMention && m.isTargetBrand);
+        if (domainMention) {
+          results.websiteQueries.domainMentions++;
+        }
+      }
     } else if (isDiscoveryQuery) {
+      results.discoveryQueries.total++;
+      if (analysis.targetBrand.mentioned) {
+        results.discoveryQueries.mentioned++;
+        if (analysis.targetBrand.position === 1) results.discoveryQueries.top1Count++;
+        if (analysis.targetBrand.position <= 3) results.discoveryQueries.top3Count++;
+      }
+    } else {
+      // Unknown query type - count as discovery for organic visibility
+      // This catches website queries that might not match exactly
       results.discoveryQueries.total++;
       if (analysis.targetBrand.mentioned) {
         results.discoveryQueries.mentioned++;
@@ -643,6 +714,9 @@ async function analyzeAllResponses(responses, targetBrand) {
   }
   if (results.discoveryQueries.total > 0) {
     results.discoveryQueries.mentionRate = Math.round((results.discoveryQueries.mentioned / results.discoveryQueries.total) * 100);
+  }
+  if (results.websiteQueries.total > 0) {
+    results.websiteQueries.mentionRate = Math.round((results.websiteQueries.mentioned / results.websiteQueries.total) * 100);
   }
 
   // Calculate ranking stats
@@ -857,6 +931,174 @@ function parseCompetitorDiscoveryResponse(responseText, targetBrand) {
   return competitors.slice(0, 10);
 }
 
+/**
+ * SENTIMENT ANALYSIS
+ * Analyzes the sentiment of how a brand is mentioned in AI responses
+ * @param {string} text - Response text
+ * @param {string} targetBrand - The brand to analyze sentiment for
+ * @returns {object} { sentiment: 'positive'|'neutral'|'negative', score: number, indicators: string[] }
+ */
+function analyzeMentionSentiment(text, targetBrand) {
+  const textLower = text.toLowerCase();
+  const brandLower = targetBrand.toLowerCase();
+  
+  // Check if brand is mentioned
+  if (!textLower.includes(brandLower)) {
+    return { sentiment: 'neutral', score: 0, indicators: [], context: null };
+  }
+  
+  // Find the context around the brand mention (200 chars before and after)
+  const brandIndex = textLower.indexOf(brandLower);
+  const contextStart = Math.max(0, brandIndex - 200);
+  const contextEnd = Math.min(text.length, brandIndex + brandLower.length + 200);
+  const context = text.substring(contextStart, contextEnd).toLowerCase();
+  
+  // Positive indicators
+  const positiveWords = [
+    'best', 'excellent', 'great', 'amazing', 'outstanding', 'top', 'leading', 'recommended',
+    'popular', 'trusted', 'reliable', 'powerful', 'innovative', 'user-friendly', 'intuitive',
+    'efficient', 'effective', 'superior', 'premium', 'award', 'winner', 'first choice',
+    'highly rated', 'well-known', 'industry leader', 'market leader', 'preferred', 'favorite',
+    'comprehensive', 'robust', 'solid', 'impressive', 'exceptional', 'fantastic', 'perfect',
+    'love', 'loved', 'loves', 'recommend', 'recommends', 'praised', 'standout', 'dominates',
+    'excels', 'shines', 'top-rated', 'highly recommended', 'go-to', 'gold standard'
+  ];
+  
+  // Negative indicators
+  const negativeWords = [
+    'worst', 'bad', 'poor', 'terrible', 'awful', 'avoid', 'overpriced', 'expensive',
+    'complicated', 'difficult', 'confusing', 'limited', 'lacking', 'disappointing',
+    'frustrating', 'outdated', 'slow', 'buggy', 'unreliable', 'issues', 'problems',
+    'criticism', 'criticized', 'concerns', 'drawbacks', 'downsides', 'weaknesses',
+    'not recommended', 'better alternatives', 'falls short', 'behind', 'lag', 'lags',
+    'controversy', 'controversial', 'scandal', 'privacy concerns', 'security issues',
+    'complaints', 'negative reviews', 'hate', 'hated', 'dislike', 'inferior', 'mediocre'
+  ];
+  
+  // Neutral/comparison indicators
+  const neutralWords = [
+    'alternative', 'option', 'choice', 'competitor', 'similar', 'comparable', 'versus',
+    'compared to', 'unlike', 'however', 'but', 'although', 'while', 'whereas'
+  ];
+  
+  let positiveScore = 0;
+  let negativeScore = 0;
+  let neutralScore = 0;
+  const foundIndicators = [];
+  
+  // Check for positive words in context
+  for (const word of positiveWords) {
+    if (context.includes(word)) {
+      positiveScore += 1;
+      foundIndicators.push(`+${word}`);
+    }
+  }
+  
+  // Check for negative words in context
+  for (const word of negativeWords) {
+    if (context.includes(word)) {
+      negativeScore += 1;
+      foundIndicators.push(`-${word}`);
+    }
+  }
+  
+  // Check for neutral words
+  for (const word of neutralWords) {
+    if (context.includes(word)) {
+      neutralScore += 0.5;
+    }
+  }
+  
+  // Special patterns that indicate sentiment
+  // Brand + "is/are" + positive adjective
+  const positivePattern = new RegExp(`${brandLower}\\s+(?:is|are)\\s+(?:a\\s+)?(?:very\\s+)?(?:${positiveWords.slice(0, 20).join('|')})`, 'i');
+  if (positivePattern.test(context)) {
+    positiveScore += 2;
+    foundIndicators.push('+direct_praise');
+  }
+  
+  // Brand + "is/are" + negative adjective
+  const negativePattern = new RegExp(`${brandLower}\\s+(?:is|are)\\s+(?:a\\s+)?(?:very\\s+)?(?:${negativeWords.slice(0, 15).join('|')})`, 'i');
+  if (negativePattern.test(context)) {
+    negativeScore += 2;
+    foundIndicators.push('-direct_criticism');
+  }
+  
+  // Top position indicators
+  if (/^1[.\)\-:]|#1|number one|top pick|best overall|first choice/i.test(context)) {
+    positiveScore += 3;
+    foundIndicators.push('+top_ranked');
+  }
+  
+  // Calculate final sentiment
+  const totalScore = positiveScore - negativeScore;
+  let sentiment = 'neutral';
+  
+  if (positiveScore > negativeScore + 1) {
+    sentiment = 'positive';
+  } else if (negativeScore > positiveScore + 1) {
+    sentiment = 'negative';
+  }
+  
+  return {
+    sentiment,
+    score: totalScore,
+    positiveScore,
+    negativeScore,
+    indicators: foundIndicators.slice(0, 5),
+    context: text.substring(contextStart, contextEnd)
+  };
+}
+
+/**
+ * Aggregate sentiment analysis across all responses
+ * @param {Array} sentimentResults - Array of individual sentiment analyses
+ * @returns {object} Aggregated sentiment data for UI display
+ */
+function aggregateSentiment(sentimentResults) {
+  const counts = { positive: 0, neutral: 0, negative: 0 };
+  let totalScore = 0;
+  const allIndicators = [];
+  
+  for (const result of sentimentResults) {
+    if (result.sentiment) {
+      counts[result.sentiment]++;
+      totalScore += result.score || 0;
+      if (result.indicators) {
+        allIndicators.push(...result.indicators);
+      }
+    }
+  }
+  
+  const total = counts.positive + counts.neutral + counts.negative;
+  
+  // Determine overall sentiment
+  let overall = 'neutral';
+  if (total > 0) {
+    if (counts.positive > counts.negative * 1.5) overall = 'positive';
+    else if (counts.negative > counts.positive * 1.5) overall = 'negative';
+  }
+  
+  // Get most common indicators
+  const indicatorCounts = {};
+  for (const ind of allIndicators) {
+    indicatorCounts[ind] = (indicatorCounts[ind] || 0) + 1;
+  }
+  const topIndicators = Object.entries(indicatorCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([ind]) => ind);
+  
+  return {
+    positive: counts.positive,
+    neutral: counts.neutral,
+    negative: counts.negative,
+    overall,
+    averageScore: total > 0 ? Math.round((totalScore / total) * 10) / 10 : 0,
+    topIndicators
+  };
+}
+
 module.exports = {
   findBrandMentions,
   analyzeResponse,
@@ -867,5 +1109,7 @@ module.exports = {
   extractRankingPosition,
   extractBrandsFromResponse,
   parseCompetitorDiscoveryResponse,
+  analyzeMentionSentiment,
+  aggregateSentiment,
   INDUSTRY_COMPETITORS
 };
