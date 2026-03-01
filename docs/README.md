@@ -1,8 +1,23 @@
-# AI Visibility Tracker
+# AI Visibility Tracker - Full Documentation
 
 **Measure how visible your brand is in AI-generated answers.**
 
 This tool analyzes brand mentions across AI search engines (like ChatGPT, Gemini, etc.) and provides actionable recommendations to improve visibility.
+
+---
+
+## 📖 Documentation Index
+
+| Document | Description |
+|----------|-------------|
+| [Quick Start](QUICKSTART.md) | Get running in 5 minutes |
+| [API Reference](API.md) | Complete API documentation |
+| [Database Schema](DATABASE.md) | Database structure and models |
+| [Backend Services](SERVICES.md) | Service layer documentation |
+| [Frontend Components](COMPONENTS.md) | React component reference |
+| [Configuration](CONFIGURATION.md) | Environment and settings |
+| [Scoring System](SCORING.md) | How scores are calculated |
+| [Troubleshooting](TROUBLESHOOTING.md) | Common issues and solutions |
 
 ---
 
