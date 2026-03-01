@@ -3,14 +3,26 @@ import React from 'react';
 function StatsGrid({ stats }) {
   if (!stats) return <p>No stats available</p>;
 
+  // Use websiteQueries if available (for domain inputs), otherwise use discoveryQueries
+  const organicStats = (stats.websiteQueries && stats.websiteQueries.total > 0) 
+    ? stats.websiteQueries 
+    : stats.discoveryQueries;
+  
+  const isWebsiteAnalysis = stats.websiteQueries && stats.websiteQueries.total > 0;
+
   return (
     <div className="stats-grid">
       {/* PRIMARY METRIC: Organic Discovery Rate - THE REAL TEST */}
-      {stats.discoveryQueries && (
+      {organicStats && (
         <div className="stat-item discovery-stat highlight-stat primary-metric">
-          <div className="stat-value highlight">{stats.discoveryQueries.mentionRate || 0}%</div>
-          <div className="stat-label">🎯 Organic Discovery Rate</div>
-          <div className="stat-sublabel">Mentioned in {stats.discoveryQueries.mentioned}/{stats.discoveryQueries.total} queries WITHOUT brand name</div>
+          <div className="stat-value highlight">{organicStats.mentionRate || 0}%</div>
+          <div className="stat-label">🎯 {isWebsiteAnalysis ? 'Website Visibility Rate' : 'Organic Discovery Rate'}</div>
+          <div className="stat-sublabel">
+            Mentioned in {organicStats.mentioned}/{organicStats.total} queries WITHOUT brand name
+            {isWebsiteAnalysis && organicStats.domainMentions > 0 && (
+              <span> ({organicStats.domainMentions} domain mentions)</span>
+            )}
+          </div>
         </div>
       )}
 
@@ -24,14 +36,14 @@ function StatsGrid({ stats }) {
       )}
 
       {/* Discovery positions */}
-      {stats.discoveryQueries && (
+      {organicStats && (
         <>
           <div className="stat-item">
-            <div className="stat-value">{stats.discoveryQueries.top1Count || 0}</div>
+            <div className="stat-value">{organicStats.top1Count || 0}</div>
             <div className="stat-label">Top 1 (Organic)</div>
           </div>
           <div className="stat-item">
-            <div className="stat-value">{stats.discoveryQueries.top3Count || 0}</div>
+            <div className="stat-value">{organicStats.top3Count || 0}</div>
             <div className="stat-label">Top 3 (Organic)</div>
           </div>
         </>

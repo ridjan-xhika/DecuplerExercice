@@ -2,12 +2,69 @@
  * Query Generator Service - Enhanced Version
  * Generates comprehensive user prompts to test brand visibility in AI responses
  * 
+ * THREE TYPES OF INPUTS:
+ * 1. DOMAIN (e.g., "shopify.com") - Online/digital focused queries
+ * 2. BRAND (e.g., "Nike") - Real-world/physical brand queries
+ * 3. MIXED - Can be both (e.g., "Amazon")
+ * 
  * TWO TYPES OF QUERIES:
  * 1. BRAND QUERIES - Mention the brand directly (test direct visibility)
  * 2. DISCOVERY QUERIES - Don't mention brand (test if AI naturally recommends it)
  */
 
 const { askAllProviders } = require('./aiClient');
+
+/**
+ * Detect if input is a website domain
+ * @param {string} input - User input (brand or domain)
+ * @returns {object} { isDomain: boolean, cleanName: string, domain: string|null }
+ */
+function detectInputType(input) {
+  const domainExtensions = [
+    '.com', '.io', '.co', '.org', '.net', '.app', '.dev', '.ai', '.so', 
+    '.xyz', '.me', '.tv', '.gg', '.ly', '.to', '.fm', '.sh', '.cc',
+    '.tech', '.cloud', '.software', '.online', '.site', '.store'
+  ];
+  
+  const inputLower = input.toLowerCase().trim();
+  
+  // Check if it looks like a domain
+  const hasDomainExtension = domainExtensions.some(ext => inputLower.endsWith(ext));
+  const hasProtocol = inputLower.startsWith('http://') || inputLower.startsWith('https://');
+  const hasDot = inputLower.includes('.');
+  
+  if (hasDomainExtension || hasProtocol) {
+    // Extract clean brand name from domain
+    let cleanName = inputLower
+      .replace(/^https?:\/\//, '')  // Remove protocol
+      .replace(/^www\./, '')         // Remove www
+      .split('/')[0];                // Remove path
+    
+    const domain = cleanName;
+    
+    // Extract brand name (remove extension)
+    cleanName = cleanName.split('.')[0];
+    // Capitalize first letter
+    cleanName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+    
+    return { isDomain: true, cleanName, domain, inputType: 'website' };
+  }
+  
+  // Check if it's a known tech/online brand (even without domain extension)
+  const onlineBrands = [
+    'shopify', 'notion', 'figma', 'slack', 'discord', 'vercel', 'netlify',
+    'github', 'gitlab', 'stripe', 'twilio', 'sendgrid', 'mailchimp',
+    'hubspot', 'salesforce', 'zendesk', 'intercom', 'asana', 'trello',
+    'monday', 'clickup', 'airtable', 'zapier', 'canva', 'miro'
+  ];
+  
+  if (onlineBrands.includes(inputLower)) {
+    return { isDomain: false, cleanName: input, domain: null, inputType: 'online_brand' };
+  }
+  
+  // Physical/real-world brand
+  return { isDomain: false, cleanName: input, domain: null, inputType: 'physical_brand' };
+}
 
 // Comprehensive query templates by category
 // IMPORTANT: Discovery queries should NOT mention {brand} - we want to see if AI naturally recommends it
@@ -40,6 +97,57 @@ const QUERY_TEMPLATES = {
     "Is {brand} better than {competitor}?",
     "Compare {brand} and {competitor}",
     "Which is better: {brand} or {competitor}?"
+  ],
+
+  // =============================================================================
+  // DOMAIN/WEBSITE QUERIES - For online platforms and websites
+  // These check if the DOMAIN/URL is mentioned in recommendations
+  // =============================================================================
+  
+  websiteDiscovery: [
+    "What website should I use to {productAction}?",
+    "Best website for {productAction}?",
+    "What's a good site to {productAction}?",
+    "Recommend a website to {productAction}",
+    "Which online platform is best for {productAction}?",
+    "What's the best online tool to {productAction}?",
+    "Best web app for {productAction}?"
+  ],
+  
+  websiteBest: [
+    "What's the best {productType} website?",
+    "Best {productType} platform online?",
+    "Top {productType} websites?",
+    "What {productType} site do you recommend?",
+    "Most popular {productType} online tool?",
+    "Best online {productType}?",
+    "What's the go-to website for {productType}?",
+    "Leading {productType} platform?"
+  ],
+  
+  websiteRanking: [
+    "Rank the top 10 {productType} websites",
+    "List the best {productType} platforms in order",
+    "What are the top 5 websites for {productAction}?",
+    "Rank the best online {productType} tools",
+    "Top {productType} sites from best to worst",
+    "Best {productType} platforms ranked"
+  ],
+  
+  websiteAlternatives: [
+    "What are some {productType} websites?",
+    "List of {productType} platforms",
+    "Websites similar to {competitor}?",
+    "Alternatives to {competitor} online?",
+    "Other {productType} sites like {competitor}?"
+  ],
+  
+  websiteUseCase: [
+    "Best website for {useCase}?",
+    "What online tool should I use for {useCase}?",
+    "Best platform for {useCase}?",
+    "Which site is best for {useCase}?",
+    "Online solution for {useCase}?"
   ],
 
   // =============================================================================
@@ -291,7 +399,8 @@ const COMMON_INTEGRATIONS = [
 
 /**
  * Use AI to analyze a brand/company and get detailed industry info
- * Enhanced prompt for better results
+ * Enhanced prompt for better results - now includes productTypes and productActions
+ * so we don't need hardcoded industry mappings
  */
 async function analyzeCompanyWithAI(brand, userContext = {}) {
   const contextHints = [];
@@ -309,16 +418,20 @@ async function analyzeCompanyWithAI(brand, userContext = {}) {
   const prompt = `Analyze the company/brand "${brand}" and provide detailed information in JSON format.${contextString}
 
 {
-  "industry": "the primary industry/field (e.g., 'CRM', 'Project Management', 'Social Media')",
-  "specificField": "more specific niche (e.g., 'Sales CRM', 'Agile Project Management', 'Social Networking')",
+  "industry": "the primary industry/field (e.g., 'CRM', 'Sportswear', 'Coffee Shops')",
+  "specificField": "more specific niche (e.g., 'Sales CRM', 'Running Shoes', 'Premium Coffee')",
   "description": "brief 2-sentence description of what they do and their value proposition",
-  "targetAudience": "primary target customers (e.g., 'small businesses', 'enterprise', 'developers', 'consumers')",
-  "mainUseCases": ["list of 5-7 specific use cases or problems their product solves"],
-  "topCompetitors": ["list of 8-10 direct competitors in the same space, ordered by relevance"],
+  "targetAudience": "primary target customers (e.g., 'small businesses', 'athletes', 'developers', 'consumers')",
+  "productTypes": ["5-6 terms people would use to search for this type of product/service (e.g., for Nike: 'running shoes', 'athletic shoes', 'sneakers', 'sports brand', 'athletic apparel', 'workout clothes')"],
+  "productActions": ["5-6 actions/verbs describing what customers do with this product (e.g., for Nike: 'buy running shoes', 'shop for athletic wear', 'find sneakers', 'get workout clothes', 'buy sports gear')"],
+  "mainUseCases": ["5-7 specific use cases or scenarios where someone would use this product (e.g., for Nike: 'running', 'going to the gym', 'playing basketball', 'working out', 'training')"],
+  "topCompetitors": ["8-10 direct competitors in the same space, ordered by relevance"],
   "competitiveAdvantages": ["3-5 things they're known for or do better than competitors"],
-  "pricingModel": "free/freemium/paid/enterprise (if known)",
-  "keyFeatures": ["5-7 main features or capabilities"]
+  "pricingModel": "free/freemium/paid/enterprise/premium (if known)",
+  "keyFeatures": ["5-7 main features, products, or capabilities"]
 }
+
+IMPORTANT: productTypes should be generic category terms (not the brand name), and productActions should be natural search phrases people would use when looking for this type of product/service.
 
 Be specific and accurate. Only respond with valid JSON, no other text.`;
 
@@ -390,11 +503,14 @@ async function generateQueriesWithAI(brand, industry = null, options = {}) {
   const aiAnalysis = await analyzeCompanyWithAI(brand, userContext);
   
   if (aiAnalysis) {
-    // Use AI-detected information
+    // Use AI-detected information - normalize the industry
+    aiAnalysis.industry = normalizeIndustry(aiAnalysis.industry);
+    console.log(`AI analysis succeeded for ${brand}, normalized industry: ${aiAnalysis.industry}`);
     return generateEnhancedQueries(brand, aiAnalysis, { queriesPerType, maxTotalQueries });
   } else {
     // Fallback to basic generation - use inferred or passed industry
-    const detectedIndustry = industry || inferIndustry(brand) || 'general';
+    const detectedIndustry = normalizeIndustry(industry || inferIndustry(brand) || 'general');
+    console.log(`AI analysis failed for ${brand}, using inferred industry: ${detectedIndustry}`);
     return generateQueries(brand, detectedIndustry, options);
   }
 }
@@ -402,7 +518,7 @@ async function generateQueriesWithAI(brand, industry = null, options = {}) {
 /**
  * Generate enhanced queries using AI analysis
  * This is the main function that creates comprehensive query sets
- * @param {string} brand - The brand name
+ * @param {string} brand - The brand name or domain
  * @param {object} analysis - AI analysis results
  * @param {object} options - Generation options
  * @returns {Array} Array of query objects
@@ -411,6 +527,14 @@ function generateEnhancedQueries(brand, analysis, options = {}) {
   const { queriesPerType = 3, maxTotalQueries = 40 } = options;
   const queries = [];
   
+  // Detect if input is a domain/website or a physical brand
+  const inputInfo = detectInputType(brand);
+  const isWebsite = inputInfo.isDomain || inputInfo.inputType === 'online_brand';
+  const displayName = inputInfo.cleanName; // Clean brand name for display
+  const domainToCheck = inputInfo.domain; // The actual domain to look for in responses
+  
+  console.log(`Input type detection: "${brand}" → ${inputInfo.inputType} (isWebsite: ${isWebsite}, cleanName: ${displayName})`);
+  
   const {
     industry = 'general',
     specificField = industry,
@@ -418,19 +542,44 @@ function generateEnhancedQueries(brand, analysis, options = {}) {
     mainUseCases = [],
     topCompetitors = [],
     keyFeatures = [],
+    productTypes: aiProductTypes = [],
+    productActions: aiProductActions = [],
     region = null
   } = analysis;
 
-  // Get industry-specific data (productTypes, productActions, useCases)
-  const industryData = INDUSTRY_DATA[industry.toLowerCase()] || INDUSTRY_DATA['general'];
+  // Normalize and map industry to our INDUSTRY_DATA keys (as fallback)
+  const normalizedIndustry = normalizeIndustry(industry);
+  
+  // Get fallback industry-specific data
+  const fallbackData = INDUSTRY_DATA[normalizedIndustry] || INDUSTRY_DATA['general'];
+  
+  // PREFER AI-generated product types/actions over hardcoded ones
+  // This makes the system work for ANY industry, not just hardcoded ones
+  const productTypes = (aiProductTypes && aiProductTypes.length >= 3) 
+    ? aiProductTypes 
+    : fallbackData.productTypes;
+  const productActions = (aiProductActions && aiProductActions.length >= 3) 
+    ? aiProductActions 
+    : fallbackData.productActions;
+  const useCases = (mainUseCases && mainUseCases.length >= 3) 
+    ? mainUseCases 
+    : fallbackData.useCases;
+  
+  console.log(`Query generation for "${analysis.industry || 'unknown'}":`);
+  console.log(`  - Using ${aiProductTypes?.length >= 3 ? 'AI-generated' : 'fallback'} productTypes:`, productTypes?.slice(0, 3));
+  console.log(`  - Using ${aiProductActions?.length >= 3 ? 'AI-generated' : 'fallback'} productActions:`, productActions?.slice(0, 3));
+  console.log(`  - Query focus: ${isWebsite ? 'ONLINE/WEBSITE' : 'REAL-WORLD/BRAND'}`);
   
   // Pick random product type and action for variety
-  const getRandomItem = (arr) => arr[Math.floor(Math.random() * arr.length)];
-  const productType = getRandomItem(industryData.productTypes);
-  const productAction = getRandomItem(industryData.productActions);
-  
-  // Use AI-detected use cases or fall back to industry defaults
-  const useCases = mainUseCases.length > 0 ? mainUseCases : industryData.useCases;
+  const getRandomItem = (arr) => arr && arr.length > 0 ? arr[Math.floor(Math.random() * arr.length)] : 'product';
+
+  // Get random competitor for comparison queries
+  const getRandomCompetitor = () => {
+    if (topCompetitors && topCompetitors.length > 0) {
+      return topCompetitors[Math.floor(Math.random() * topCompetitors.length)];
+    }
+    return 'alternatives';
+  };
 
   // Helper to add queries from templates with product-specific replacements
   const addQueries = (templates, type, count = queriesPerType, extraReplacements = {}) => {
@@ -440,16 +589,17 @@ function generateEnhancedQueries(brand, analysis, options = {}) {
     
     for (const template of selected) {
       // Pick fresh random product type/action for each query for variety
-      const thisProductType = getRandomItem(industryData.productTypes);
-      const thisProductAction = getRandomItem(industryData.productActions);
+      const thisProductType = getRandomItem(productTypes);
+      const thisProductAction = getRandomItem(productActions);
       
       let queryText = template
-        .replace(/{brand}/g, brand)
+        .replace(/{brand}/g, displayName) // Use clean name, not domain
         .replace(/{productType}/g, thisProductType)
         .replace(/{productAction}/g, thisProductAction)
         .replace(/{industry}/g, industry)
         .replace(/{specificField}/g, specificField)
-        .replace(/{targetAudience}/g, targetAudience);
+        .replace(/{targetAudience}/g, targetAudience)
+        .replace(/{competitor}/g, getRandomCompetitor());
       
       // Apply additional replacements
       for (const [key, value] of Object.entries(extraReplacements)) {
@@ -459,7 +609,13 @@ function generateEnhancedQueries(brand, analysis, options = {}) {
       queries.push({
         queryText,
         queryType: type,
-        metadata: { productType: thisProductType, productAction: thisProductAction, ...extraReplacements }
+        metadata: { 
+          productType: thisProductType, 
+          productAction: thisProductAction, 
+          isWebsiteQuery: isWebsite,
+          domainToCheck: domainToCheck,
+          ...extraReplacements 
+        }
       });
     }
   };
@@ -476,30 +632,69 @@ function generateEnhancedQueries(brand, analysis, options = {}) {
 
   // Skip brand opinion and comparison queries - they inflate mention rate artificially
 
-  // ============ DISCOVERY QUERIES (NO brand mentioned) - THE REAL TEST ============
-  // 85%+ of queries should be discovery - this is TRUE AI visibility
-  // If AI recommends your brand without being asked, THAT'S real visibility
-
-  // 3. RANKING QUERIES (CRITICAL) - "Rank the top 10 companies" (6 queries)
-  addQueries(QUERY_TEMPLATES.ranking, 'ranking', 6);
-
-  // 4. PRODUCT DISCOVERY - "Where can I buy running shoes?" (8 queries)
-  addQueries(QUERY_TEMPLATES.productDiscovery, 'productDiscovery', 8);
-
-  // 5. BEST QUERIES - "What's the best running shoe brand?" (8 queries)
-  addQueries(QUERY_TEMPLATES.bestQueries, 'bestQueries', 8);
-
-  // 6. USE CASE QUERIES (up to 6 queries)
-  if (useCases.length > 0) {
-    const useCasesToQuery = useCases.slice(0, 6);
-    for (const useCase of useCasesToQuery) {
-      addQueries(QUERY_TEMPLATES.useCase, 'useCase', 1, { useCase });
+  // ============ DISCOVERY QUERIES - THE REAL TEST ============
+  // Different query types based on whether it's a website or physical brand
+  
+  if (isWebsite) {
+    // =============================================================================
+    // WEBSITE/ONLINE FOCUS - Check if the DOMAIN is mentioned in recommendations
+    // Queries about best websites, online platforms, web tools, etc.
+    // =============================================================================
+    console.log(`  → Generating WEBSITE-FOCUSED queries for domain: ${domainToCheck || displayName}`);
+    
+    // 3. WEBSITE RANKING QUERIES - "Rank the top 10 websites for X" (6 queries)
+    addQueries(QUERY_TEMPLATES.websiteRanking, 'websiteRanking', 6);
+    
+    // 4. WEBSITE DISCOVERY - "What website should I use to...?" (8 queries)
+    addQueries(QUERY_TEMPLATES.websiteDiscovery, 'websiteDiscovery', 8);
+    
+    // 5. WEBSITE BEST - "What's the best X website?" (8 queries)
+    addQueries(QUERY_TEMPLATES.websiteBest, 'websiteBest', 8);
+    
+    // 6. WEBSITE USE CASES - "Best website for [specific use case]?" (6 queries)
+    if (useCases.length > 0) {
+      const useCasesToQuery = useCases.slice(0, 6);
+      for (const useCase of useCasesToQuery) {
+        addQueries(QUERY_TEMPLATES.websiteUseCase, 'websiteUseCase', 1, { useCase });
+      }
     }
+    
+    // 7. WEBSITE ALTERNATIVES - "Websites similar to X?" (4 queries)
+    addQueries(QUERY_TEMPLATES.websiteAlternatives, 'websiteAlternatives', 4);
+    
+    // 8. Also add some general discovery queries (online context)
+    addQueries(QUERY_TEMPLATES.productDiscovery, 'productDiscovery', 4);
+    
+  } else {
+    // =============================================================================
+    // PHYSICAL/REAL-WORLD BRAND FOCUS - Traditional brand visibility queries
+    // Queries about products, stores, purchases, real-world activities
+    // =============================================================================
+    console.log(`  → Generating REAL-WORLD/BRAND queries for: ${displayName}`);
+
+    // 3. RANKING QUERIES (CRITICAL) - "Rank the top 10 companies" (6 queries)
+    addQueries(QUERY_TEMPLATES.ranking, 'ranking', 6);
+
+    // 4. PRODUCT DISCOVERY - "Where can I buy running shoes?" (8 queries)
+    addQueries(QUERY_TEMPLATES.productDiscovery, 'productDiscovery', 8);
+
+    // 5. BEST QUERIES - "What's the best running shoe brand?" (8 queries)
+    addQueries(QUERY_TEMPLATES.bestQueries, 'bestQueries', 8);
+
+    // 6. USE CASE QUERIES (up to 6 queries)
+    if (useCases.length > 0) {
+      const useCasesToQuery = useCases.slice(0, 6);
+      for (const useCase of useCasesToQuery) {
+        addQueries(QUERY_TEMPLATES.useCase, 'useCase', 1, { useCase });
+      }
+    }
+
+    // 7. AUDIENCE-SPECIFIC QUERIES (5 queries)
+    addQueries(QUERY_TEMPLATES.audienceSpecific, 'audienceSpecific', 5);
   }
 
-  // 7. AUDIENCE-SPECIFIC QUERIES (5 queries)
-  addQueries(QUERY_TEMPLATES.audienceSpecific, 'audienceSpecific', 5);
-
+  // ============ COMMON QUERIES (Both website and brand) ============
+  
   // 8. PRICING QUERIES - free/affordable options (3 queries)
   addQueries(QUERY_TEMPLATES.pricing, 'pricing', 3);
 
@@ -523,10 +718,13 @@ function generateEnhancedQueries(brand, analysis, options = {}) {
   // DON'T shuffle - keep high priority queries first
   const result = uniqueQueries.slice(0, maxTotalQueries);
   
-  console.log(`Generated ${result.length} unique queries for ${brand} (industry: ${industry})`);
-  console.log(`Using product types: ${industryData.productTypes.slice(0, 3).join(', ')}`);
-  console.log(`Using product actions: ${industryData.productActions.slice(0, 3).join(', ')}`);
-  console.log(`Query breakdown: ${result.filter(q => q.queryType === 'directBrand').length} direct brand, ${result.filter(q => q.queryType === 'productDiscovery').length} product discovery, ${result.filter(q => q.queryType === 'bestQueries').length} best queries`);
+  console.log(`Generated ${result.length} unique queries for ${displayName} (industry: ${industry}, type: ${isWebsite ? 'WEBSITE' : 'BRAND'})`);
+  const queryBreakdown = {};
+  for (const q of result) {
+    queryBreakdown[q.queryType] = (queryBreakdown[q.queryType] || 0) + 1;
+  }
+  console.log(`Query breakdown:`, queryBreakdown);
+  console.log(`Sample queries:`, result.slice(0, 3).map(q => ({ text: q.queryText, type: q.queryType })));
   return result;
 }
 
@@ -625,6 +823,195 @@ function generateQueries(brand, industry = 'general', options = {}) {
 
   console.log(`[Fallback] Generated ${queries.length} queries for ${brand} (industry: ${industry})`);
   return queries;
+}
+
+/**
+ * Normalize AI-returned industry names to match our INDUSTRY_DATA keys
+ * This ensures we get proper product types even when AI returns different industry names
+ * @param {string} industry - The industry name from AI or user
+ * @returns {string} Normalized industry key that matches INDUSTRY_DATA
+ */
+function normalizeIndustry(industry) {
+  if (!industry) return 'general';
+  
+  const industryLower = industry.toLowerCase().trim();
+  
+  // Direct match
+  if (INDUSTRY_DATA[industryLower]) {
+    return industryLower;
+  }
+  
+  // Mapping of various AI-returned industry names to our INDUSTRY_DATA keys
+  const industryMappings = {
+    // Sportswear mappings
+    'sportswear': 'sportswear',
+    'athletic apparel': 'sportswear',
+    'athletic wear': 'sportswear',
+    'activewear': 'sportswear',
+    'sports apparel': 'sportswear',
+    'footwear': 'sportswear',
+    'athletic footwear': 'sportswear',
+    'sports footwear': 'sportswear',
+    'sneakers': 'sportswear',
+    'running shoes': 'sportswear',
+    'athletic shoes': 'sportswear',
+    'sports equipment': 'sportswear',
+    'sporting goods': 'sportswear',
+    'athletics': 'sportswear',
+    'sports': 'sportswear',
+    'fitness': 'sportswear',
+    'fitness apparel': 'sportswear',
+    'workout gear': 'sportswear',
+    'gym wear': 'sportswear',
+    
+    // Fashion mappings
+    'fashion': 'fashion',
+    'apparel': 'fashion',
+    'clothing': 'fashion',
+    'fashion retail': 'fashion',
+    'luxury fashion': 'fashion',
+    'fast fashion': 'fashion',
+    'retail fashion': 'fashion',
+    'designer fashion': 'fashion',
+    'luxury goods': 'fashion',
+    
+    // Fast food mappings
+    'fast food': 'fast food',
+    'quick service restaurant': 'fast food',
+    'qsr': 'fast food',
+    'restaurants': 'fast food',
+    'food service': 'fast food',
+    'fast casual': 'fast food',
+    'food & beverage': 'fast food',
+    
+    // Coffee mappings
+    'coffee': 'coffee',
+    'coffee shop': 'coffee',
+    'cafe': 'coffee',
+    'coffeehouse': 'coffee',
+    'coffee chain': 'coffee',
+    'beverage': 'coffee',
+    
+    // Automotive mappings
+    'automotive': 'automotive',
+    'automobile': 'automotive',
+    'auto': 'automotive',
+    'cars': 'automotive',
+    'vehicles': 'automotive',
+    'electric vehicles': 'automotive',
+    'ev': 'automotive',
+    'automobile manufacturing': 'automotive',
+    'car manufacturing': 'automotive',
+    
+    // Tech industry mappings
+    'social media': 'social media',
+    'social networking': 'social media',
+    'social network': 'social media',
+    'social platform': 'social media',
+    
+    'crm': 'crm',
+    'customer relationship management': 'crm',
+    'sales software': 'crm',
+    'sales crm': 'crm',
+    
+    'project management': 'project management',
+    'task management': 'project management',
+    'work management': 'project management',
+    'productivity': 'project management',
+    'productivity software': 'project management',
+    
+    'ecommerce': 'ecommerce',
+    'e-commerce': 'ecommerce',
+    'online retail': 'ecommerce',
+    'online shopping': 'ecommerce',
+    'digital commerce': 'ecommerce',
+    
+    'music streaming': 'music streaming',
+    'audio streaming': 'music streaming',
+    'music': 'music streaming',
+    'music service': 'music streaming',
+    
+    'video streaming': 'video streaming',
+    'streaming': 'video streaming',
+    'streaming service': 'video streaming',
+    'ott': 'video streaming',
+    'entertainment': 'video streaming',
+    
+    'gaming communication': 'gaming communication',
+    'gaming': 'gaming communication',
+    'gaming platform': 'gaming communication',
+    
+    'communication': 'communication',
+    'team communication': 'communication',
+    'collaboration': 'communication',
+    'video conferencing': 'communication',
+    'messaging': 'communication',
+    
+    'development': 'development',
+    'software development': 'development',
+    'devops': 'development',
+    'developer tools': 'development',
+    
+    'design': 'design',
+    'design tools': 'design',
+    'graphic design': 'design',
+    'ui design': 'design',
+    'ux design': 'design',
+    
+    'customer support': 'customer support',
+    'help desk': 'customer support',
+    'customer service': 'customer support',
+    'support software': 'customer support',
+    
+    'finance': 'finance',
+    'fintech': 'finance',
+    'payments': 'finance',
+    'accounting': 'finance',
+    'financial services': 'finance',
+    
+    'marketing': 'marketing',
+    'email marketing': 'marketing',
+    'digital marketing': 'marketing',
+    'marketing automation': 'marketing',
+    
+    'retail': 'retail',
+    'online marketplace': 'retail',
+    'marketplace': 'retail',
+    'general retail': 'retail',
+    
+    'travel': 'travel',
+    'hospitality': 'travel',
+    'travel & hospitality': 'travel',
+    'hotels': 'travel',
+    'booking': 'travel',
+    
+    'banking': 'banking',
+    'financial': 'banking',
+    'bank': 'banking',
+    'financial institution': 'banking'
+  };
+  
+  // Check direct mapping
+  if (industryMappings[industryLower]) {
+    return industryMappings[industryLower];
+  }
+  
+  // Check if any mapping key is contained in the industry string
+  for (const [key, value] of Object.entries(industryMappings)) {
+    if (industryLower.includes(key) || key.includes(industryLower)) {
+      return value;
+    }
+  }
+  
+  // Fallback: check if any INDUSTRY_DATA key is in the string
+  for (const key of Object.keys(INDUSTRY_DATA)) {
+    if (industryLower.includes(key)) {
+      return key;
+    }
+  }
+  
+  console.log(`Could not normalize industry: "${industry}", falling back to general`);
+  return 'general';
 }
 
 /**
@@ -743,6 +1130,8 @@ module.exports = {
   analyzeCompanyWithAI,
   generateEnhancedQueries,
   inferIndustry,
+  normalizeIndustry,
+  detectInputType,
   getQueryStats,
   QUERY_TEMPLATES,
   INDUSTRY_DATA,
